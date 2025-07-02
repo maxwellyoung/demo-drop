@@ -26,6 +26,13 @@ export default function AudioPlayer({
   const [showSpeedDropdown, setShowSpeedDropdown] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
 
+  // Loop functionality
+  const [isLooping, setIsLooping] = useState(false);
+  const [loopStart, setLoopStart] = useState<number | null>(null);
+  const [loopEnd, setLoopEnd] = useState<number | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionStart, setSelectionStart] = useState<number | null>(null);
+
   const speedOptions = [
     { value: 0.5, label: "0.5x" },
     { value: 0.75, label: "0.75x" },
@@ -35,10 +42,11 @@ export default function AudioPlayer({
     { value: 2, label: "2x" },
   ];
 
-  // Reset speed when audio URL changes
+  // Reset speed and loop when audio URL changes
   useEffect(() => {
     setPlaybackSpeed(1);
     setShowSpeedDropdown(false);
+    clearLoop();
   }, [audioUrl]);
 
   // HTML5 audio setup
@@ -53,7 +61,18 @@ export default function AudioPlayer({
     };
 
     const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
+      const time = audio.currentTime;
+      setCurrentTime(time);
+
+      // Handle looping
+      if (
+        isLooping &&
+        loopStart !== null &&
+        loopEnd !== null &&
+        time >= loopEnd
+      ) {
+        audio.currentTime = loopStart;
+      }
     };
 
     const handlePlay = () => setIsPlaying(true);
@@ -135,7 +154,18 @@ export default function AudioPlayer({
 
         wavesurfer.current.on("audioprocess", () => {
           if (isMounted) {
-            setCurrentTime(wavesurfer.current.getCurrentTime());
+            const time = wavesurfer.current.getCurrentTime();
+            setCurrentTime(time);
+
+            // Handle looping for WaveSurfer
+            if (
+              isLooping &&
+              loopStart !== null &&
+              loopEnd !== null &&
+              time >= loopEnd
+            ) {
+              wavesurfer.current.seekTo(loopStart / duration);
+            }
           }
         });
 
@@ -151,11 +181,17 @@ export default function AudioPlayer({
           console.error("WaveSurfer error:", error);
         });
 
-        // Add click handler for timestamp comments
+        // Add click handler for timestamp comments and loop selection
         wavesurfer.current.on("click", (progress: number) => {
           if (isMounted) {
             const clickTime = progress * duration;
-            if (
+
+            // Handle loop selection (Alt+Click to start/end selection)
+            if (window.event && (window.event as KeyboardEvent).altKey) {
+              handleLoopSelection(clickTime);
+            }
+            // Handle timestamp comments
+            else if (
               typeof window !== "undefined" &&
               (window as any).setCommentTimestamp
             ) {
@@ -215,6 +251,48 @@ export default function AudioPlayer({
     });
   };
 
+  // Add loop overlay to waveform
+  const addLoopOverlay = () => {
+    if (
+      !hasWaveform ||
+      !wavesurfer.current ||
+      !duration ||
+      loopStart === null ||
+      loopEnd === null
+    )
+      return;
+
+    // Remove existing loop overlay
+    const existingOverlay = waveformRef.current?.querySelector(".loop-overlay");
+    if (existingOverlay) {
+      existingOverlay.remove();
+    }
+
+    const startPercent = (loopStart / duration) * 100;
+    const endPercent = (loopEnd / duration) * 100;
+    const width = endPercent - startPercent;
+
+    // Create loop overlay element
+    const overlay = document.createElement("div");
+    overlay.className = "loop-overlay";
+    overlay.style.position = "absolute";
+    overlay.style.left = `${startPercent}%`;
+    overlay.style.top = "0";
+    overlay.style.bottom = "0";
+    overlay.style.width = `${width}%`;
+    overlay.style.backgroundColor = isLooping
+      ? "rgba(34, 197, 94, 0.2)"
+      : "rgba(234, 179, 8, 0.2)";
+    overlay.style.border = isLooping
+      ? "1px solid rgba(34, 197, 94, 0.5)"
+      : "1px solid rgba(234, 179, 8, 0.5)";
+    overlay.style.zIndex = "5";
+    overlay.style.pointerEvents = "none";
+    overlay.title = `Loop: ${formatTime(loopStart)} - ${formatTime(loopEnd)}`;
+
+    waveformRef.current?.appendChild(overlay);
+  };
+
   // Update markers when comments change
   useEffect(() => {
     if (hasWaveform) {
@@ -228,6 +306,13 @@ export default function AudioPlayer({
       addCommentMarkers();
     }
   }, [comments, hasWaveform, duration]);
+
+  // Update loop overlay when loop state changes
+  useEffect(() => {
+    if (hasWaveform) {
+      addLoopOverlay();
+    }
+  }, [hasWaveform, duration, loopStart, loopEnd, isLooping]);
 
   // Close speed dropdown when clicking outside
   useEffect(() => {
@@ -330,6 +415,18 @@ export default function AudioPlayer({
           toggleMute();
           break;
 
+        case "KeyL":
+          e.preventDefault();
+          toggleLoop();
+          break;
+
+        case "KeyC":
+          if (e.shiftKey) {
+            e.preventDefault();
+            clearLoop();
+          }
+          break;
+
         case "Slash":
           if (e.shiftKey) {
             // Shift + / = ?
@@ -372,6 +469,42 @@ export default function AudioPlayer({
     }
   };
 
+  // Loop selection handler
+  const handleLoopSelection = (time: number) => {
+    if (loopStart === null) {
+      // First click - set start
+      setLoopStart(time);
+      setLoopEnd(null);
+      setIsLooping(false);
+    } else if (loopEnd === null) {
+      // Second click - set end and enable loop
+      const start = Math.min(loopStart, time);
+      const end = Math.max(loopStart, time);
+      setLoopStart(start);
+      setLoopEnd(end);
+      setIsLooping(true);
+    } else {
+      // Third click - clear loop
+      setLoopStart(null);
+      setLoopEnd(null);
+      setIsLooping(false);
+    }
+  };
+
+  // Toggle loop on/off (when loop points are set)
+  const toggleLoop = () => {
+    if (loopStart !== null && loopEnd !== null) {
+      setIsLooping(!isLooping);
+    }
+  };
+
+  // Clear loop selection
+  const clearLoop = () => {
+    setLoopStart(null);
+    setLoopEnd(null);
+    setIsLooping(false);
+  };
+
   const togglePlayPause = () => {
     if (hasWaveform && wavesurfer.current) {
       wavesurfer.current.playPause();
@@ -397,8 +530,12 @@ export default function AudioPlayer({
     const percentage = ((e.clientX - rect.left) / rect.width) * 100;
     const clickTime = (percentage / 100) * duration;
 
+    // If alt is held, handle loop selection
+    if (e.altKey) {
+      handleLoopSelection(clickTime);
+    }
     // If shift is held, add timestamp comment
-    if (
+    else if (
       e.shiftKey &&
       typeof window !== "undefined" &&
       (window as any).setCommentTimestamp
@@ -489,6 +626,26 @@ export default function AudioPlayer({
                     style={{ width: `${progressPercentage}%` }}
                   />
 
+                  {/* Loop region overlay for basic player */}
+                  {loopStart !== null && loopEnd !== null && duration > 0 && (
+                    <div
+                      className="absolute top-0 bottom-0 border-2 pointer-events-none"
+                      style={{
+                        left: `${(loopStart / duration) * 100}%`,
+                        width: `${((loopEnd - loopStart) / duration) * 100}%`,
+                        backgroundColor: isLooping
+                          ? "rgba(34, 197, 94, 0.15)"
+                          : "rgba(234, 179, 8, 0.15)",
+                        borderColor: isLooping
+                          ? "rgba(34, 197, 94, 0.4)"
+                          : "rgba(234, 179, 8, 0.4)",
+                      }}
+                      title={`Loop: ${formatTime(loopStart)} - ${formatTime(
+                        loopEnd
+                      )}`}
+                    />
+                  )}
+
                   {/* Comment markers for basic player */}
                   {comments.map((comment, index) => {
                     if (comment.audioTimestamp !== undefined && duration > 0) {
@@ -521,8 +678,8 @@ export default function AudioPlayer({
         <div className="text-xs text-neutral-500 text-center mt-2 space-y-1">
           <p>
             {hasWaveform
-              ? "Click on waveform to add timestamp comment"
-              : "Shift+Click on progress bar to add timestamp comment"}
+              ? "Click: timestamp comment • Alt+Click: loop selection"
+              : "Shift+Click: timestamp comment • Alt+Click: loop selection"}
           </p>
           <p className="text-neutral-600">
             Press{" "}
@@ -628,6 +785,52 @@ export default function AudioPlayer({
             >
               <path d="M1 4v6h6" />
               <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+          </button>
+
+          {/* Loop Control */}
+          <button
+            onClick={toggleLoop}
+            disabled={loopStart === null || loopEnd === null}
+            className={`p-3 rounded-xl transition-all duration-200 hover:scale-105 group ${
+              isLooping
+                ? "bg-green-600/20 hover:bg-green-600/30"
+                : loopStart !== null && loopEnd !== null
+                ? "hover:bg-neutral-800/50"
+                : "opacity-50 cursor-not-allowed"
+            }`}
+            title={
+              loopStart === null || loopEnd === null
+                ? "Alt+Click to select loop region"
+                : isLooping
+                ? `Loop active: ${formatTime(loopStart)} - ${formatTime(
+                    loopEnd
+                  )}`
+                : `Loop ready: ${formatTime(loopStart)} - ${formatTime(
+                    loopEnd
+                  )}`
+            }
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className={`transition-colors ${
+                isLooping
+                  ? "text-green-400"
+                  : loopStart !== null && loopEnd !== null
+                  ? "text-neutral-400 group-hover:text-neutral-300"
+                  : "text-neutral-600"
+              }`}
+            >
+              <path d="M11 19H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5" />
+              <path d="M13 5h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5" />
+              <circle cx="12" cy="12" r="3" />
+              <path d="M16 8l-4-4-4 4" />
+              <path d="M8 16l4 4 4-4" />
             </svg>
           </button>
 
@@ -754,6 +957,18 @@ export default function AudioPlayer({
                     <span className="text-neutral-400">Mute/Unmute</span>
                     <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
                       M
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-400">Toggle Loop</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
+                      L
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-400">Clear Loop</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
+                      Shift+C
                     </kbd>
                   </div>
                   <div className="flex justify-between items-center">
