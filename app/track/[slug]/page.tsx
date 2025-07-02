@@ -1,10 +1,10 @@
 import { readFile } from "fs/promises";
 import { notFound } from "next/navigation";
 import path from "path";
-import AudioPlayer from "@/components/AudioPlayer";
 import ShareButton from "@/components/ShareButton";
 import ReactionsPanel from "@/components/ReactionsPanel";
-import CommentsSection from "@/components/CommentsSection";
+import MetadataEditor from "@/components/MetadataEditor";
+import TrackInteractions from "@/components/TrackInteractions";
 
 interface TrackMetadata {
   slug: string;
@@ -102,20 +102,22 @@ export default async function TrackPage({
         </p>
       </div>
 
-      {/* Audio Player with Comments Integration */}
-      <div className="mb-12">
-        <AudioPlayer
-          audioUrl={audioUrl}
-          title={metadata.title}
-          comments={comments}
-        />
-      </div>
+      {/* Track Interactions - Audio Player and Comments */}
+      <TrackInteractions
+        audioUrl={audioUrl}
+        title={metadata.title}
+        trackSlug={metadata.slug}
+        initialComments={comments}
+      />
 
       {/* Actions - Jordan Singer inspired layout */}
-      <div className="flex flex-col sm:flex-row gap-6 mb-12">
+      <div className="flex flex-col sm:flex-row justify-center items-center gap-8 my-8">
         <ShareButton url={shareUrl} title={metadata.title} />
         <ReactionsPanel slug={metadata.slug} reactions={metadata.reactions} />
       </div>
+
+      {/* Track Metadata Editor */}
+      <MetadataEditor trackSlug={metadata.slug} />
 
       {/* Track Info - Michael Bierut inspired information design */}
       <div className="track-info p-8 mb-8">
@@ -179,9 +181,6 @@ export default async function TrackPage({
           </div>
         </div>
       </div>
-
-      {/* Comments Section with Timestamp Support */}
-      <CommentsSection trackSlug={metadata.slug} />
     </div>
   );
 }

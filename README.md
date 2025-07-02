@@ -61,4 +61,4 @@ NEXT_PUBLIC_BASE_URL=http://localhost:3000  # For production, use your domain
 
 ---
 
-_Made by [maxwellyoung.nz](https://maxwellyoung.nz)_
+_Made by [maxwellyoung.nz](https://maxwellyoung.info)_

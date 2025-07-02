@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 interface AudioPlayerProps {
   audioUrl: string;
@@ -64,14 +64,16 @@ export default function AudioPlayer({
       const time = audio.currentTime;
       setCurrentTime(time);
 
-      // Handle looping
+      // Handle looping - use ref for current state
+      const currentLoopState = loopStateRef.current;
       if (
-        isLooping &&
-        loopStart !== null &&
-        loopEnd !== null &&
-        time >= loopEnd
+        currentLoopState.isLooping &&
+        currentLoopState.loopStart !== null &&
+        currentLoopState.loopEnd !== null &&
+        time >= currentLoopState.loopEnd
       ) {
-        audio.currentTime = loopStart;
+        console.log("Loop: jumping to start");
+        audio.currentTime = currentLoopState.loopStart;
       }
     };
 
@@ -157,14 +159,16 @@ export default function AudioPlayer({
             const time = wavesurfer.current.getCurrentTime();
             setCurrentTime(time);
 
-            // Handle looping for WaveSurfer
+            // Handle looping for WaveSurfer - use ref for current state
+            const currentLoopState = loopStateRef.current;
             if (
-              isLooping &&
-              loopStart !== null &&
-              loopEnd !== null &&
-              time >= loopEnd
+              currentLoopState.isLooping &&
+              currentLoopState.loopStart !== null &&
+              currentLoopState.loopEnd !== null &&
+              time >= currentLoopState.loopEnd
             ) {
-              wavesurfer.current.seekTo(loopStart / duration);
+              console.log("Loop: jumping to start");
+              wavesurfer.current.seekTo(currentLoopState.loopStart / duration);
             }
           }
         });
@@ -181,21 +185,23 @@ export default function AudioPlayer({
           console.error("WaveSurfer error:", error);
         });
 
-        // Add click handler for timestamp comments and loop selection
+        // Note: Alt+Click handler will be added in separate useEffect to ensure fresh handleLoopSelection reference
+
         wavesurfer.current.on("click", (progress: number) => {
           if (isMounted) {
             const clickTime = progress * duration;
+            console.log("WaveSurfer click at time:", clickTime);
 
-            // Handle loop selection (Alt+Click to start/end selection)
-            if (window.event && (window.event as KeyboardEvent).altKey) {
-              handleLoopSelection(clickTime);
-            }
-            // Handle timestamp comments
-            else if (
+            // Only handle timestamp comments if Alt is not pressed
+            // (Alt+Click is handled by mousedown event above)
+            if (
               typeof window !== "undefined" &&
               (window as any).setCommentTimestamp
             ) {
+              console.log("Handling timestamp comment");
               (window as any).setCommentTimestamp(clickTime);
+            } else {
+              console.log("Regular WaveSurfer click - no special action");
             }
           }
         });
@@ -336,6 +342,82 @@ export default function AudioPlayer({
     }
   }, [hasWaveform, playbackSpeed]);
 
+  // Use ref to track current state and bypass React timing
+  const loopStateRef = useRef({ loopStart, loopEnd, isLooping });
+
+  useEffect(() => {
+    loopStateRef.current = { loopStart, loopEnd, isLooping };
+  }, [loopStart, loopEnd, isLooping]);
+
+  // Loop functions - using useCallback to avoid stale closure issues
+  const handleLoopSelection = useCallback(
+    (time: number) => {
+      // Use ref values to avoid stale closure
+      const currentState = loopStateRef.current;
+
+      if (currentState.loopStart === null) {
+        // First click - set start
+        console.log("Setting loop start:", time);
+        setLoopStart(time);
+        setLoopEnd(null);
+        setIsLooping(false);
+      } else if (currentState.loopEnd === null) {
+        // Second click - set end and enable loop
+        const start = Math.min(currentState.loopStart, time);
+        const end = Math.max(currentState.loopStart, time);
+        console.log("Setting loop end and enabling:", start, "to", end);
+        setLoopStart(start);
+        setLoopEnd(end);
+        setIsLooping(true);
+      } else {
+        // Third click - clear loop
+        console.log("Clearing loop");
+        setLoopStart(null);
+        setLoopEnd(null);
+        setIsLooping(false);
+      }
+    },
+    [loopStart, loopEnd, isLooping]
+  );
+
+  const toggleLoop = useCallback(() => {
+    console.log("toggleLoop called", { loopStart, loopEnd, isLooping });
+    if (loopStart !== null && loopEnd !== null) {
+      const newLoopState = !isLooping;
+      console.log("Toggling loop to:", newLoopState);
+      setIsLooping(newLoopState);
+    } else {
+      console.log("Cannot toggle loop - no loop points set");
+    }
+  }, [loopStart, loopEnd, isLooping]);
+
+  const clearLoop = useCallback(() => {
+    setLoopStart(null);
+    setLoopEnd(null);
+    setIsLooping(false);
+  }, []);
+
+  // Separate useEffect for Alt+Click handler to ensure fresh handleLoopSelection reference
+  useEffect(() => {
+    const waveformContainer = waveformRef.current;
+    if (!waveformContainer || !hasWaveform) return;
+
+    const handleAltClick = (e: MouseEvent) => {
+      if (e.altKey) {
+        e.preventDefault();
+        const rect = waveformContainer.getBoundingClientRect();
+        const progress = (e.clientX - rect.left) / rect.width;
+        const clickTime = progress * duration;
+        console.log("Alt+Click at time:", clickTime);
+        handleLoopSelection(clickTime);
+      }
+    };
+
+    waveformContainer.addEventListener("mousedown", handleAltClick);
+    return () =>
+      waveformContainer.removeEventListener("mousedown", handleAltClick);
+  }, [hasWaveform, duration, handleLoopSelection]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -445,7 +527,15 @@ export default function AudioPlayer({
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [hasWaveform, duration, volume, isPlaying]);
+  }, [
+    hasWaveform,
+    duration,
+    volume,
+    isPlaying,
+    toggleLoop,
+    clearLoop,
+    showKeyboardHelp,
+  ]);
 
   // Helper functions for keyboard shortcuts
   const seekRelative = (seconds: number) => {
@@ -467,42 +557,6 @@ export default function AudioPlayer({
     } else if (audioRef.current) {
       audioRef.current.volume = newVolume;
     }
-  };
-
-  // Loop selection handler
-  const handleLoopSelection = (time: number) => {
-    if (loopStart === null) {
-      // First click - set start
-      setLoopStart(time);
-      setLoopEnd(null);
-      setIsLooping(false);
-    } else if (loopEnd === null) {
-      // Second click - set end and enable loop
-      const start = Math.min(loopStart, time);
-      const end = Math.max(loopStart, time);
-      setLoopStart(start);
-      setLoopEnd(end);
-      setIsLooping(true);
-    } else {
-      // Third click - clear loop
-      setLoopStart(null);
-      setLoopEnd(null);
-      setIsLooping(false);
-    }
-  };
-
-  // Toggle loop on/off (when loop points are set)
-  const toggleLoop = () => {
-    if (loopStart !== null && loopEnd !== null) {
-      setIsLooping(!isLooping);
-    }
-  };
-
-  // Clear loop selection
-  const clearLoop = () => {
-    setLoopStart(null);
-    setLoopEnd(null);
-    setIsLooping(false);
   };
 
   const togglePlayPause = () => {
@@ -530,8 +584,18 @@ export default function AudioPlayer({
     const percentage = ((e.clientX - rect.left) / rect.width) * 100;
     const clickTime = (percentage / 100) * duration;
 
+    console.log(
+      "Progress bar click at time:",
+      clickTime,
+      "altKey:",
+      e.altKey,
+      "shiftKey:",
+      e.shiftKey
+    );
+
     // If alt is held, handle loop selection
     if (e.altKey) {
+      console.log("Handling loop selection for progress bar click");
       handleLoopSelection(clickTime);
     }
     // If shift is held, add timestamp comment
@@ -540,8 +604,10 @@ export default function AudioPlayer({
       typeof window !== "undefined" &&
       (window as any).setCommentTimestamp
     ) {
+      console.log("Handling timestamp comment");
       (window as any).setCommentTimestamp(clickTime);
     } else {
+      console.log("Regular progress bar click - seeking");
       seek(percentage);
     }
   };

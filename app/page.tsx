@@ -1,14 +1,33 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function HomePage() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [recentTracks, setRecentTracks] = useState([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // Fetch recent tracks
+  useEffect(() => {
+    const fetchRecentTracks = async () => {
+      try {
+        const response = await fetch("/api/tracks/recent");
+        if (response.ok) {
+          const tracks = await response.json();
+          setRecentTracks(tracks.slice(0, 3)); // Show only 3 most recent
+        }
+      } catch (error) {
+        console.error("Failed to fetch recent tracks:", error);
+      }
+    };
+
+    fetchRecentTracks();
+  }, []);
 
   const acceptedTypes = [".mp3", ".wav", ".m4a", ".flac"];
 
@@ -153,6 +172,49 @@ export default function HomePage() {
             onChange={handleFileSelect}
             className="hidden"
           />
+        </div>
+      )}
+
+      {/* Recently Added Section */}
+      {recentTracks.length > 0 && (
+        <div className="mt-24 container-narrow">
+          <div className="text-center mb-12">
+            <h2 className="heading-lg mb-4 text-neutral-200">Recently Added</h2>
+            <p className="text-secondary">Latest demos from the community</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {recentTracks.map((track: any) => (
+              <Link
+                key={track.slug}
+                href={`/track/${track.slug}`}
+                className="recent-track-card group"
+              >
+                <div className="recent-track-artwork">
+                  <div className="w-full h-32 bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-xl flex items-center justify-center">
+                    <div className="text-2xl opacity-60">🎵</div>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-neutral-100 group-hover:text-neutral-50 transition-colors">
+                    {track.title}
+                  </h3>
+                  <p className="text-xs text-neutral-400 mt-1">
+                    {track.artist}
+                  </p>
+                  <p className="text-xs text-neutral-500 mt-2">
+                    {new Date(track.uploadedAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          <div className="text-center mt-8">
+            <Link href="/tracks" className="btn-secondary">
+              View All Tracks
+            </Link>
+          </div>
         </div>
       )}
     </div>

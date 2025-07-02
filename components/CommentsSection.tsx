@@ -12,9 +12,13 @@ interface Comment {
 
 interface CommentsSectionProps {
   trackSlug: string;
+  onCommentsUpdate?: (comments: Comment[]) => void;
 }
 
-export default function CommentsSection({ trackSlug }: CommentsSectionProps) {
+export default function CommentsSection({
+  trackSlug,
+  onCommentsUpdate,
+}: CommentsSectionProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [author, setAuthor] = useState("");
   const [message, setMessage] = useState("");
@@ -29,7 +33,13 @@ export default function CommentsSection({ trackSlug }: CommentsSectionProps) {
     try {
       const response = await fetch(`/api/comments/${trackSlug}`);
       const data = await response.json();
-      setComments(data.comments || []);
+      const newComments = data.comments || [];
+      setComments(newComments);
+
+      // Notify parent component of comments update
+      if (onCommentsUpdate) {
+        onCommentsUpdate(newComments);
+      }
     } catch (error) {
       console.error("Error fetching comments:", error);
     }
@@ -57,24 +67,26 @@ export default function CommentsSection({ trackSlug }: CommentsSectionProps) {
 
       if (response.ok) {
         const newComment = await response.json();
-        setComments((prev) =>
-          [...prev, newComment].sort((a, b) => {
-            if (
-              a.audioTimestamp !== undefined &&
-              b.audioTimestamp !== undefined
-            ) {
-              return a.audioTimestamp - b.audioTimestamp;
-            }
-            if (a.audioTimestamp !== undefined) return -1;
-            if (b.audioTimestamp !== undefined) return 1;
-            return a.timestamp - b.timestamp;
-          })
-        );
+        const updatedComments = [...comments, newComment].sort((a, b) => {
+          if (
+            a.audioTimestamp !== undefined &&
+            b.audioTimestamp !== undefined
+          ) {
+            return a.audioTimestamp - b.audioTimestamp;
+          }
+          if (a.audioTimestamp !== undefined) return -1;
+          if (b.audioTimestamp !== undefined) return 1;
+          return a.timestamp - b.timestamp;
+        });
+
+        setComments(updatedComments);
         setMessage("");
         setPendingTimestamp(null);
 
-        // Refresh the page to update comment markers
-        window.location.reload();
+        // Notify parent component of comments update
+        if (onCommentsUpdate) {
+          onCommentsUpdate(updatedComments);
+        }
       }
     } catch (error) {
       console.error("Error posting comment:", error);
@@ -127,12 +139,15 @@ export default function CommentsSection({ trackSlug }: CommentsSectionProps) {
 
       if (response.ok) {
         // Remove comment from state
-        setComments((prev) =>
-          prev.filter((comment) => comment.id !== commentId)
+        const updatedComments = comments.filter(
+          (comment) => comment.id !== commentId
         );
+        setComments(updatedComments);
 
-        // Refresh to update comment markers
-        setTimeout(() => window.location.reload(), 500);
+        // Notify parent component of comments update
+        if (onCommentsUpdate) {
+          onCommentsUpdate(updatedComments);
+        }
       } else {
         const error = await response.json();
         alert(error.message || "Failed to delete comment");
