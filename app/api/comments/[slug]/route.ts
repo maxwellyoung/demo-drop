@@ -129,3 +129,59 @@ export async function POST(
     );
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { slug: string } }
+) {
+  try {
+    const { commentId } = await request.json();
+
+    if (!commentId) {
+      return NextResponse.json(
+        { error: "Comment ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const commentsPath = path.join(
+      process.cwd(),
+      "public",
+      "uploads",
+      `${params.slug}-comments.json`
+    );
+
+    // Read existing comments
+    let commentsData: CommentsData = { comments: [] };
+    try {
+      const existingData = await readFile(commentsPath, "utf-8");
+      commentsData = JSON.parse(existingData);
+    } catch (error) {
+      return NextResponse.json(
+        { error: "Comments file not found" },
+        { status: 404 }
+      );
+    }
+
+    // Find and remove the comment
+    const initialLength = commentsData.comments.length;
+    commentsData.comments = commentsData.comments.filter(
+      (comment) => comment.id !== commentId
+    );
+
+    if (commentsData.comments.length === initialLength) {
+      return NextResponse.json({ error: "Comment not found" }, { status: 404 });
+    }
+
+    // Write back to file
+    await writeFile(commentsPath, JSON.stringify(commentsData, null, 2));
+
+    return NextResponse.json({ success: true, message: "Comment deleted" });
+  } catch (error) {
+    console.error("Error deleting comment:", error);
+    return NextResponse.json(
+      { error: "Failed to delete comment" },
+      { status: 500 }
+    );
+  }
+}

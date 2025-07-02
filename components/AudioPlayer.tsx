@@ -22,6 +22,23 @@ export default function AudioPlayer({
   const [duration, setDuration] = useState(0);
   const [hasWaveform, setHasWaveform] = useState(false);
   const [volume, setVolume] = useState(1);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [showSpeedDropdown, setShowSpeedDropdown] = useState(false);
+
+  const speedOptions = [
+    { value: 0.5, label: "0.5x" },
+    { value: 0.75, label: "0.75x" },
+    { value: 1, label: "1x" },
+    { value: 1.25, label: "1.25x" },
+    { value: 1.5, label: "1.5x" },
+    { value: 2, label: "2x" },
+  ];
+
+  // Reset speed when audio URL changes
+  useEffect(() => {
+    setPlaybackSpeed(1);
+    setShowSpeedDropdown(false);
+  }, [audioUrl]);
 
   // HTML5 audio setup
   useEffect(() => {
@@ -31,6 +48,7 @@ export default function AudioPlayer({
 
     const handleLoadedMetadata = () => {
       setDuration(audio.duration || 0);
+      audio.playbackRate = playbackSpeed;
     };
 
     const handleTimeUpdate = () => {
@@ -210,6 +228,28 @@ export default function AudioPlayer({
     }
   }, [comments, hasWaveform, duration]);
 
+  // Close speed dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showSpeedDropdown) {
+        const target = event.target as HTMLElement;
+        if (!target.closest(".relative")) {
+          setShowSpeedDropdown(false);
+        }
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showSpeedDropdown]);
+
+  // Apply playback speed when WaveSurfer is ready
+  useEffect(() => {
+    if (hasWaveform && wavesurfer.current && playbackSpeed !== 1) {
+      wavesurfer.current.setPlaybackRate(playbackSpeed);
+    }
+  }, [hasWaveform, playbackSpeed]);
+
   const togglePlayPause = () => {
     if (hasWaveform && wavesurfer.current) {
       wavesurfer.current.playPause();
@@ -263,6 +303,17 @@ export default function AudioPlayer({
       wavesurfer.current.seekTo(0);
     } else if (audioRef.current) {
       audioRef.current.currentTime = 0;
+    }
+  };
+
+  const changePlaybackSpeed = (speed: number) => {
+    setPlaybackSpeed(speed);
+    setShowSpeedDropdown(false);
+
+    if (hasWaveform && wavesurfer.current) {
+      wavesurfer.current.setPlaybackRate(speed);
+    } else if (audioRef.current) {
+      audioRef.current.playbackRate = speed;
     }
   };
 
@@ -448,6 +499,54 @@ export default function AudioPlayer({
               <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
             </svg>
           </button>
+
+          {/* Speed Control */}
+          <div className="relative">
+            <button
+              onClick={() => setShowSpeedDropdown(!showSpeedDropdown)}
+              className="px-3 py-2 hover:bg-neutral-800/50 rounded-xl transition-all duration-200 hover:scale-105 group flex items-center gap-1 min-w-[60px] justify-center"
+              title="Playback Speed"
+            >
+              <span className="text-sm font-medium text-neutral-400 group-hover:text-neutral-300 transition-colors">
+                {
+                  speedOptions.find((option) => option.value === playbackSpeed)
+                    ?.label
+                }
+              </span>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className={`text-neutral-400 group-hover:text-neutral-300 transition-all duration-200 ${
+                  showSpeedDropdown ? "rotate-180" : ""
+                }`}
+              >
+                <polyline points="6,9 12,15 18,9" />
+              </svg>
+            </button>
+
+            {/* Speed Dropdown */}
+            {showSpeedDropdown && (
+              <div className="absolute bottom-full right-0 mb-2 bg-neutral-800 border border-neutral-700 rounded-xl shadow-xl z-50 min-w-[80px] overflow-hidden">
+                {speedOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => changePlaybackSpeed(option.value)}
+                    className={`w-full px-4 py-2 text-sm text-left hover:bg-neutral-700 transition-colors ${
+                      playbackSpeed === option.value
+                        ? "bg-neutral-700 text-neutral-200"
+                        : "text-neutral-400"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
