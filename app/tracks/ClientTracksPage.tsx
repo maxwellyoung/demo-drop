@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { TrackCard } from "./TrackCard";
 import { SearchFilters } from "../../components/SearchFilters";
+import PowerUserFeatures from "../../components/PowerUserFeatures";
 
 interface TrackMetadata {
   slug: string;
@@ -89,6 +90,33 @@ export function ClientTracksPage({ tracks }: ClientTracksPageProps) {
       tracks.map((track) => track.extendedMetadata?.genre).filter(Boolean)
     ).size,
   };
+
+  // Power user feature handlers
+  const handleBulkAction = useCallback((action: string, trackIds: string[]) => {
+    console.log(`Bulk action "${action}" for tracks:`, trackIds);
+    // TODO: Implement bulk actions
+    alert(`${action} action completed for ${trackIds.length} tracks`);
+  }, []);
+
+  const handleAdvancedSearch = useCallback((query: string, filters: any) => {
+    console.log("Advanced search:", { query, filters });
+    // TODO: Implement advanced search
+    alert(
+      `Advanced search: "${query}" with filters: ${JSON.stringify(filters)}`
+    );
+  }, []);
+
+  const handleExportData = useCallback((format: string) => {
+    console.log("Export data:", format);
+    // TODO: Implement data export
+    alert(`Exporting data in ${format} format`);
+  }, []);
+
+  const handleImportData = useCallback((data: any) => {
+    console.log("Import data:", data);
+    // TODO: Implement data import
+    alert(`Importing ${data.length} tracks`);
+  }, []);
 
   return (
     <div className="container-wide animate-fade-in">
@@ -199,6 +227,15 @@ export function ClientTracksPage({ tracks }: ClientTracksPageProps) {
           )}
         </>
       )}
+
+      {/* Power User Features */}
+      <PowerUserFeatures
+        tracks={tracks}
+        onBulkAction={handleBulkAction}
+        onAdvancedSearch={handleAdvancedSearch}
+        onExportData={handleExportData}
+        onImportData={handleImportData}
+      />
     </div>
   );
 }

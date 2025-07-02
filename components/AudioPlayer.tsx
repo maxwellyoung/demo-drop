@@ -105,12 +105,28 @@ export default function AudioPlayer({
     }
   };
 
-  // Expose seek function globally for comments
+  // Expose functions globally for keyboard shortcuts and comments
   useEffect(() => {
     if (typeof window !== "undefined") {
       (window as any).seekToAudioTime = seekToTime;
+      (window as any).togglePlayPause = togglePlayPause;
+      (window as any).nextTrack = () => {
+        // This will be handled by the parent component
+        const event = new CustomEvent("nextTrack");
+        window.dispatchEvent(event);
+      };
+      (window as any).previousTrack = () => {
+        // This will be handled by the parent component
+        const event = new CustomEvent("previousTrack");
+        window.dispatchEvent(event);
+      };
+      (window as any).volumeUp = () => adjustVolume(0.1);
+      (window as any).volumeDown = () => adjustVolume(-0.1);
+      (window as any).toggleMute = toggleMute;
+      (window as any).restart = restart;
+      (window as any).changePlaybackSpeed = changePlaybackSpeed;
     }
-  }, [hasWaveform, duration]);
+  }, [hasWaveform, duration, volume]);
 
   // WaveSurfer setup
   useEffect(() => {

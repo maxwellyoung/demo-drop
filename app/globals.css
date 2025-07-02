@@ -188,6 +188,51 @@
     animation: fadeIn 0.6s ease-out forwards;
   }
 
+  /* Keyboard Shortcuts Feedback - Inspired by Jordan Singer's refined interactions */
+  @keyframes shortcutFeedback {
+    0% {
+      opacity: 0;
+      transform: translateY(-10px) scale(0.95);
+    }
+    20% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    80% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-10px) scale(0.95);
+    }
+  }
+
+  .animate-shortcut-feedback {
+    animation: shortcutFeedback 1.5s ease-out forwards;
+  }
+
+  /* Power User Panel - Inspired by Emil Kowalski's modern aesthetics */
+  .power-user-panel {
+    @apply bg-neutral-900/95 backdrop-blur-xl border border-neutral-800/50 rounded-3xl shadow-2xl;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      rgba(255, 255, 255, 0.01) 100%
+    );
+  }
+
+  .power-user-section {
+    @apply bg-neutral-800/30 rounded-xl border border-neutral-700/30;
+    backdrop-filter: blur(10px);
+  }
+
+  .power-user-button {
+    @apply w-12 h-12 bg-neutral-900/80 backdrop-blur-xl border border-neutral-800/50 rounded-2xl;
+    @apply text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800/80;
+    @apply transition-all duration-300 ease-out shadow-xl hover:shadow-2xl hover:scale-110;
+  }
+
   .hover-lift {
     @apply transition-all duration-300 ease-out;
   }
