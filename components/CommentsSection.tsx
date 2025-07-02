@@ -8,6 +8,14 @@ interface Comment {
   message: string;
   timestamp: number;
   audioTimestamp?: number;
+  category?: "feedback" | "question" | "suggestion" | "bug" | "general";
+  reactions?: {
+    like?: number;
+    helpful?: number;
+    agree?: number;
+  };
+  replies?: Comment[];
+  parentId?: string;
 }
 
 interface CommentsSectionProps {
@@ -24,6 +32,11 @@ export default function CommentsSection({
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [pendingTimestamp, setPendingTimestamp] = useState<number | null>(null);
+  const [selectedCategory, setSelectedCategory] =
+    useState<Comment["category"]>("feedback");
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyMessage, setReplyMessage] = useState("");
+  const [showReplies, setShowReplies] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchComments();
@@ -36,7 +49,6 @@ export default function CommentsSection({
       const newComments = data.comments || [];
       setComments(newComments);
 
-      // Notify parent component of comments update
       if (onCommentsUpdate) {
         onCommentsUpdate(newComments);
       }
@@ -62,6 +74,7 @@ export default function CommentsSection({
           author: author.trim(),
           message: message.trim(),
           audioTimestamp: pendingTimestamp,
+          category: selectedCategory,
         }),
       });
 
@@ -83,7 +96,6 @@ export default function CommentsSection({
         setMessage("");
         setPendingTimestamp(null);
 
-        // Notify parent component of comments update
         if (onCommentsUpdate) {
           onCommentsUpdate(updatedComments);
         }
@@ -92,6 +104,84 @@ export default function CommentsSection({
       console.error("Error posting comment:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleReply = async (parentId: string) => {
+    if (!replyMessage.trim()) return;
+
+    try {
+      const response = await fetch(`/api/comments/${trackSlug}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          author: author.trim(),
+          message: replyMessage.trim(),
+          parentId,
+        }),
+      });
+
+      if (response.ok) {
+        const newReply = await response.json();
+        const updatedComments = comments.map((comment) => {
+          if (comment.id === parentId) {
+            return {
+              ...comment,
+              replies: [...(comment.replies || []), newReply],
+            };
+          }
+          return comment;
+        });
+
+        setComments(updatedComments);
+        setReplyMessage("");
+        setReplyingTo(null);
+
+        if (onCommentsUpdate) {
+          onCommentsUpdate(updatedComments);
+        }
+      }
+    } catch (error) {
+      console.error("Error posting reply:", error);
+    }
+  };
+
+  const handleReaction = async (
+    commentId: string,
+    reactionType: "like" | "helpful" | "agree"
+  ) => {
+    try {
+      const response = await fetch(`/api/comments/${trackSlug}/reactions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          commentId,
+          reactionType,
+        }),
+      });
+
+      if (response.ok) {
+        const updatedComments = comments.map((comment) => {
+          if (comment.id === commentId) {
+            return {
+              ...comment,
+              reactions: {
+                ...comment.reactions,
+                [reactionType]: (comment.reactions?.[reactionType] || 0) + 1,
+              },
+            };
+          }
+          return comment;
+        });
+
+        setComments(updatedComments);
+      }
+    } catch (error) {
+      console.error("Error adding reaction:", error);
     }
   };
 
@@ -117,7 +207,6 @@ export default function CommentsSection({
   };
 
   const handleSeekToTime = (time: number) => {
-    // Send seek command to audio player via global function
     if (typeof window !== "undefined" && (window as any).seekToAudioTime) {
       (window as any).seekToAudioTime(time);
     }
@@ -138,13 +227,11 @@ export default function CommentsSection({
       });
 
       if (response.ok) {
-        // Remove comment from state
         const updatedComments = comments.filter(
           (comment) => comment.id !== commentId
         );
         setComments(updatedComments);
 
-        // Notify parent component of comments update
         if (onCommentsUpdate) {
           onCommentsUpdate(updatedComments);
         }
@@ -158,7 +245,36 @@ export default function CommentsSection({
     }
   };
 
-  // Listen for timestamp setting from audio player
+  const getCategoryIcon = (category: Comment["category"]) => {
+    switch (category) {
+      case "feedback":
+        return "💬";
+      case "question":
+        return "❓";
+      case "suggestion":
+        return "💡";
+      case "bug":
+        return "🐛";
+      default:
+        return "💬";
+    }
+  };
+
+  const getCategoryColor = (category: Comment["category"]) => {
+    switch (category) {
+      case "feedback":
+        return "text-blue-400 bg-blue-900/20 border-blue-800/50";
+      case "question":
+        return "text-yellow-400 bg-yellow-900/20 border-yellow-800/50";
+      case "suggestion":
+        return "text-green-400 bg-green-900/20 border-green-800/50";
+      case "bug":
+        return "text-red-400 bg-red-900/20 border-red-800/50";
+      default:
+        return "text-neutral-400 bg-neutral-900/20 border-neutral-800/50";
+    }
+  };
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       (window as any).setCommentTimestamp = (time: number) => {
@@ -166,6 +282,161 @@ export default function CommentsSection({
       };
     }
   }, []);
+
+  const renderComment = (comment: Comment, isReply = false) => (
+    <div
+      key={comment.id}
+      className={`bg-neutral-900/30 border border-neutral-800/50 rounded-xl p-4 hover:bg-neutral-900/50 transition-colors ${
+        isReply ? "ml-8 border-l-2 border-l-blue-500/30" : ""
+      }`}
+    >
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-3">
+          <span className="font-medium text-sm">{comment.author}</span>
+          {comment.category && (
+            <span
+              className={`px-2 py-1 rounded-md text-xs border ${getCategoryColor(
+                comment.category
+              )}`}
+            >
+              {getCategoryIcon(comment.category)} {comment.category}
+            </span>
+          )}
+          {comment.audioTimestamp !== undefined && (
+            <button
+              onClick={() => handleSeekToTime(comment.audioTimestamp!)}
+              className="px-2 py-1 bg-blue-900/30 border border-blue-800/50 rounded-md text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-900/50 transition-all duration-200 flex items-center gap-1"
+              title="Jump to this moment"
+            >
+              🎵 {formatTime(comment.audioTimestamp)}
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-neutral-500 text-xs">
+            {formatRelativeTime(comment.timestamp)}
+          </span>
+          <button
+            onClick={() => handleDeleteComment(comment.id)}
+            className="p-1 hover:bg-red-900/30 rounded text-neutral-500 hover:text-red-400 transition-all duration-200"
+            title="Delete comment"
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M3 6h18" />
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+              <path d="M8 6V4c0-1 1-2 2-2h4c0-1 1-2 2-2v2" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <p className="text-sm text-neutral-300 leading-relaxed mb-3">
+        {comment.message}
+      </p>
+
+      {/* Reactions */}
+      <div className="flex items-center gap-2 mb-3">
+        <button
+          onClick={() => handleReaction(comment.id, "like")}
+          className="flex items-center gap-1 px-2 py-1 bg-neutral-800/50 hover:bg-neutral-700/50 rounded-md text-xs text-neutral-400 hover:text-red-400 transition-all duration-200"
+        >
+          👍 {comment.reactions?.like || 0}
+        </button>
+        <button
+          onClick={() => handleReaction(comment.id, "helpful")}
+          className="flex items-center gap-1 px-2 py-1 bg-neutral-800/50 hover:bg-neutral-700/50 rounded-md text-xs text-neutral-400 hover:text-green-400 transition-all duration-200"
+        >
+          ✅ {comment.reactions?.helpful || 0}
+        </button>
+        <button
+          onClick={() => handleReaction(comment.id, "agree")}
+          className="flex items-center gap-1 px-2 py-1 bg-neutral-800/50 hover:bg-neutral-700/50 rounded-md text-xs text-neutral-400 hover:text-blue-400 transition-all duration-200"
+        >
+          👌 {comment.reactions?.agree || 0}
+        </button>
+      </div>
+
+      {/* Reply Section */}
+      {!isReply && (
+        <div className="border-t border-neutral-800/50 pt-3">
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              onClick={() =>
+                setShowReplies((prev) => {
+                  const newSet = new Set(prev);
+                  if (newSet.has(comment.id)) {
+                    newSet.delete(comment.id);
+                  } else {
+                    newSet.add(comment.id);
+                  }
+                  return newSet;
+                })
+              }
+              className="text-xs text-neutral-400 hover:text-neutral-300 transition-colors"
+            >
+              {showReplies.has(comment.id) ? "Hide" : "Show"} replies (
+              {comment.replies?.length || 0})
+            </button>
+            <button
+              onClick={() => setReplyingTo(comment.id)}
+              className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              Reply
+            </button>
+          </div>
+
+          {/* Reply Form */}
+          {replyingTo === comment.id && (
+            <div className="mb-3 p-3 bg-neutral-800/30 rounded-lg">
+              <textarea
+                placeholder="Write a reply..."
+                className="w-full px-3 py-2 bg-neutral-900/50 border border-neutral-700/50 rounded-md text-sm placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600 transition-colors resize-none"
+                rows={2}
+                value={replyMessage}
+                onChange={(e) => setReplyMessage(e.target.value)}
+              />
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => handleReply(comment.id)}
+                  disabled={!replyMessage.trim()}
+                  className="btn-primary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Reply
+                </button>
+                <button
+                  onClick={() => {
+                    setReplyingTo(null);
+                    setReplyMessage("");
+                  }}
+                  className="btn-secondary text-xs"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Replies */}
+          {showReplies.has(comment.id) &&
+            comment.replies &&
+            comment.replies.length > 0 && (
+              <div className="space-y-2">
+                {comment.replies.map((reply) => renderComment(reply, true))}
+              </div>
+            )}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="track-info p-8">
@@ -205,6 +476,19 @@ export default function CommentsSection({
               value={author}
               onChange={(e) => setAuthor(e.target.value)}
             />
+            <select
+              value={selectedCategory}
+              onChange={(e) =>
+                setSelectedCategory(e.target.value as Comment["category"])
+              }
+              className="px-4 py-3 bg-neutral-900/50 border border-neutral-700/50 rounded-xl text-sm text-neutral-300 focus:outline-none focus:border-neutral-600 transition-colors"
+            >
+              <option value="feedback">💬 Feedback</option>
+              <option value="question">❓ Question</option>
+              <option value="suggestion">💡 Suggestion</option>
+              <option value="bug">🐛 Bug Report</option>
+              <option value="general">💬 General</option>
+            </select>
           </div>
 
           <div className="flex gap-3">
@@ -241,55 +525,7 @@ export default function CommentsSection({
             </p>
           </div>
         ) : (
-          comments.map((comment) => (
-            <div
-              key={comment.id}
-              className="bg-neutral-900/30 border border-neutral-800/50 rounded-xl p-4 hover:bg-neutral-900/50 transition-colors"
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <span className="font-medium text-sm">{comment.author}</span>
-                  {comment.audioTimestamp !== undefined && (
-                    <button
-                      onClick={() => handleSeekToTime(comment.audioTimestamp!)}
-                      className="px-2 py-1 bg-blue-900/30 border border-blue-800/50 rounded-md text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-900/50 transition-all duration-200 flex items-center gap-1"
-                      title="Jump to this moment"
-                    >
-                      🎵 {formatTime(comment.audioTimestamp)}
-                    </button>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-neutral-500 text-xs">
-                    {formatRelativeTime(comment.timestamp)}
-                  </span>
-                  <button
-                    onClick={() => handleDeleteComment(comment.id)}
-                    className="p-1 hover:bg-red-900/30 rounded text-neutral-500 hover:text-red-400 transition-all duration-200"
-                    title="Delete comment"
-                  >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M3 6h18" />
-                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                      <path d="M8 6V4c0-1 1-2 2-2h4c0-1 1-2 2-2v2" />
-                      <line x1="10" y1="11" x2="10" y2="17" />
-                      <line x1="14" y1="11" x2="14" y2="17" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              <p className="text-sm text-neutral-300 leading-relaxed">
-                {comment.message}
-              </p>
-            </div>
-          ))
+          comments.map((comment) => renderComment(comment))
         )}
       </div>
     </div>

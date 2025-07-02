@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { usePlayer } from "../../components/PersistentMiniPlayer";
+import ShareButton from "../../components/ShareButton";
+import AddToPlaylistButton from "../../components/AddToPlaylistButton";
 
 interface TrackMetadata {
   slug: string;
@@ -42,7 +45,9 @@ interface TrackCardProps {
 }
 
 export function TrackCard({ track, gradientFrom, gradientTo }: TrackCardProps) {
-  const { playTrack, addToQueue } = usePlayer();
+  const { playTrack, addToQueue, playerState } = usePlayer();
+  const { currentTrack, currentTime } = playerState;
+  const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
 
   const totalReactions = Object.values(track.reactions).reduce(
     (sum, count) => sum + count,
@@ -66,8 +71,11 @@ export function TrackCard({ track, gradientFrom, gradientTo }: TrackCardProps) {
     addToQueue(playerTrack);
   };
 
+  // Check if this track is currently playing
+  const isCurrentlyPlaying = currentTrack?.slug === track.slug;
+
   return (
-    <Link href={`/track/${track.slug}`} className="group block">
+    <div className="group block">
       <div className="track-card">
         {/* Artwork */}
         <div className="track-artwork">
@@ -121,8 +129,29 @@ export function TrackCard({ track, gradientFrom, gradientTo }: TrackCardProps) {
 
         {/* Track Info */}
         <div className="track-details">
-          <h3 className="track-title">{track.title}</h3>
-          <p className="track-artist">{track.artist}</p>
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <Link href={`/track/${track.slug}`} className="flex-1 min-w-0">
+              <h3 className="track-title">{track.title}</h3>
+              <p className="track-artist">{track.artist}</p>
+            </Link>
+
+            {/* Action Buttons */}
+            <div className="flex-shrink-0 flex items-center gap-2">
+              {/* Add to Playlist Button */}
+              <AddToPlaylistButton track={track} />
+
+              {/* Share Button - only show if track is currently playing */}
+              {isCurrentlyPlaying && (
+                <ShareButton
+                  url={`${window.location.origin}/track/${track.slug}`}
+                  title={track.title}
+                  artist={track.artist}
+                  currentTime={currentTime}
+                  duration={track.extendedMetadata?.duration}
+                />
+              )}
+            </div>
+          </div>
 
           {track.extendedMetadata?.description && (
             <p className="track-description">
@@ -172,6 +201,6 @@ export function TrackCard({ track, gradientFrom, gradientTo }: TrackCardProps) {
           </div>
         </div>
       </div>
-    </Link>
+    </div>
   );
 }

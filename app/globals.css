@@ -2,91 +2,119 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Design System - Inspired by Legendary Designers */
+/* Jeremy Blake: Minimalist elegance, precise typography */
+/* Jony Ive: Intuitive interaction, material honesty */
+/* Dieter Rams: "Less, but better" - essential functionality */
+/* Michael Beirut: Clear hierarchy, purposeful typography */
+/* Benji Taylor: Modern minimalism with personality */
+/* Mariana Castilho: Organic shapes, human-centered design */
+/* Rauno Freiberg: Clean lines, functional beauty */
+/* Jason Yuan: Sophisticated minimalism */
+/* MDS: Systematic design with clear visual language */
+/* Jordan Singer: Refined interactions */
+/* Emil Kowalski: Modern aesthetics with timeless appeal */
+
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap");
 
 @layer base {
   html {
-    font-feature-settings: "rlig" 1, "calt" 1, "kern" 1;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
   }
 
   body {
-    @apply bg-neutral-950 text-neutral-50 font-light;
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
-      system-ui, sans-serif;
-    font-variation-settings: "wght" 350;
-    letter-spacing: -0.011em;
+    @apply bg-neutral-950 text-neutral-100;
+    font-variation-settings: "wght" 400;
+    letter-spacing: -0.01em;
+    line-height: 1.6;
   }
 
   * {
-    @apply border-neutral-800;
+    @apply border-neutral-800/50;
   }
 }
 
 @layer components {
-  /* Jony Ive inspired minimalism */
+  /* Drop Zone - Inspired by Jony Ive's material honesty */
   .drop-zone {
-    @apply border border-neutral-800/50 rounded-2xl p-12 text-center transition-all duration-500 ease-out;
-    @apply hover:border-neutral-700/70 hover:bg-neutral-900/20;
-    @apply cursor-pointer select-none;
-    backdrop-filter: blur(20px);
+    @apply relative border-2 border-dashed border-neutral-700/50 rounded-3xl p-12 text-center transition-all duration-500 ease-out;
+    @apply hover:border-neutral-600/50 hover:bg-neutral-900/20;
     background: linear-gradient(
       135deg,
       rgba(255, 255, 255, 0.02) 0%,
-      rgba(255, 255, 255, 0.005) 100%
+      rgba(255, 255, 255, 0.01) 100%
     );
+    backdrop-filter: blur(20px);
   }
 
   .drop-zone.drag-over {
-    @apply border-neutral-500 bg-neutral-900/40 scale-[1.02];
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1),
-      0 20px 40px -12px rgba(0, 0, 0, 0.4);
+    @apply border-blue-500/50 bg-blue-500/5 scale-[1.02];
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.15);
   }
 
-  /* Dieter Rams "honest materials" approach */
+  /* Button System - Inspired by Dieter Rams' "Less, but better" */
   .btn-primary {
-    @apply px-6 py-3 bg-neutral-50 text-neutral-950 rounded-xl font-medium;
-    @apply hover:bg-neutral-100 active:bg-neutral-200;
-    @apply transition-all duration-200 ease-out;
-    @apply hover:scale-[1.02] active:scale-[0.98];
+    @apply inline-flex items-center gap-2.5 px-6 py-3 bg-neutral-100 text-neutral-900 font-medium rounded-2xl transition-all duration-300 ease-out;
+    @apply hover:bg-neutral-200 hover:scale-[1.02] hover:shadow-xl hover:shadow-neutral-900/20;
+    @apply focus:outline-none focus:ring-2 focus:ring-neutral-100/50 focus:ring-offset-2 focus:ring-offset-neutral-950;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100;
     font-variation-settings: "wght" 500;
-    letter-spacing: -0.01em;
-  }
-
-  .btn-secondary {
-    @apply px-6 py-3 border border-neutral-700/70 rounded-xl font-medium;
-    @apply hover:border-neutral-600 hover:bg-neutral-900/30;
-    @apply transition-all duration-200 ease-out;
-    @apply hover:scale-[1.02] active:scale-[0.98];
-    font-variation-settings: "wght" 450;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
     backdrop-filter: blur(10px);
   }
 
-  /* Rauno Freiberg inspired typography */
+  .btn-secondary {
+    @apply inline-flex items-center gap-2.5 px-6 py-3 bg-neutral-900/80 text-neutral-100 font-medium rounded-2xl border border-neutral-800/50 transition-all duration-300 ease-out;
+    @apply hover:bg-neutral-800/80 hover:border-neutral-700/50 hover:scale-[1.02] hover:shadow-xl hover:shadow-neutral-900/20;
+    @apply focus:outline-none focus:ring-2 focus:ring-neutral-100/20 focus:ring-offset-2 focus:ring-offset-neutral-950;
+    font-variation-settings: "wght" 500;
+    letter-spacing: -0.02em;
+    backdrop-filter: blur(10px);
+  }
+
+  .btn-tertiary {
+    @apply inline-flex items-center gap-2 px-4 py-2 text-neutral-400 hover:text-neutral-200 transition-all duration-200;
+    @apply hover:bg-neutral-900/50 rounded-xl;
+    font-variation-settings: "wght" 450;
+    letter-spacing: -0.01em;
+  }
+
+  /* Typography System - Inspired by Michael Beirut's purposeful hierarchy */
   .heading-xl {
-    @apply text-6xl md:text-8xl font-light tracking-tighter;
-    font-variation-settings: "wght" 200;
-    letter-spacing: -0.04em;
-    line-height: 0.85;
+    @apply text-4xl font-light text-neutral-50;
+    font-variation-settings: "wght" 300;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
   }
 
   .heading-lg {
-    @apply text-3xl md:text-4xl font-light tracking-tight;
+    @apply text-2xl font-light text-neutral-50;
     font-variation-settings: "wght" 300;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.02em;
+    line-height: 1.3;
+  }
+
+  .heading-md {
+    @apply text-xl font-medium text-neutral-100;
+    font-variation-settings: "wght" 500;
+    letter-spacing: -0.01em;
+    line-height: 1.4;
   }
 
   .text-secondary {
     @apply text-neutral-400;
     font-variation-settings: "wght" 400;
-    letter-spacing: -0.008em;
+    letter-spacing: -0.01em;
   }
 
-  /* Emil Kowalski micro-interactions */
+  /* Audio Player - Inspired by Jony Ive's intuitive interaction */
   .audio-player {
-    @apply bg-neutral-900/50 backdrop-blur-xl rounded-2xl border border-neutral-800/50;
+    @apply bg-neutral-900/80 backdrop-blur-xl rounded-3xl border border-neutral-800/30 p-6;
     @apply transition-all duration-300 ease-out;
     background: linear-gradient(
       135deg,
@@ -96,453 +124,611 @@
   }
 
   .play-button {
-    @apply w-14 h-14 bg-neutral-50 text-neutral-950 rounded-full flex items-center justify-center;
-    @apply hover:bg-neutral-100 active:bg-neutral-200;
-    @apply transition-all duration-200 ease-out;
-    @apply hover:scale-105 active:scale-95;
-    @apply shadow-lg hover:shadow-xl;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15),
-      0 0 0 1px rgba(255, 255, 255, 0.1);
+    @apply w-16 h-16 bg-neutral-100 text-neutral-900 rounded-full flex items-center justify-center;
+    @apply hover:bg-neutral-200 hover:scale-110 transition-all duration-300 ease-out;
+    @apply shadow-xl shadow-neutral-900/20;
+    backdrop-filter: blur(10px);
   }
 
-  /* Jason Yuan inspired spacing system */
+  /* Container System - Inspired by Jeremy Blake's precise spacing */
   .container-narrow {
-    @apply max-w-2xl mx-auto px-6;
+    @apply max-w-4xl mx-auto px-6;
   }
 
   .container-wide {
-    @apply max-w-5xl mx-auto px-6;
+    @apply max-w-7xl mx-auto px-6;
   }
 
-  /* Jordan Singer design systems approach */
+  /* Reaction System - Inspired by Jordan Singer's refined interactions */
   .reaction-button {
-    @apply flex items-center gap-2 px-4 py-2.5 rounded-xl border border-neutral-700/50;
-    @apply hover:border-neutral-600 hover:bg-neutral-900/40;
-    @apply transition-all duration-200 ease-out;
-    @apply hover:scale-[1.02] active:scale-[0.98];
-    font-variation-settings: "wght" 450;
+    @apply flex items-center gap-2 px-4 py-2 bg-neutral-900/50 rounded-2xl border border-neutral-800/30 transition-all duration-300 ease-out;
+    @apply hover:bg-neutral-800/50 hover:border-neutral-700/50 hover:scale-[1.02];
+    @apply focus:outline-none focus:ring-2 focus:ring-neutral-100/20 focus:ring-offset-2 focus:ring-offset-neutral-950;
     backdrop-filter: blur(10px);
   }
 
   .reaction-button.active {
-    @apply bg-neutral-50 text-neutral-950 border-neutral-50;
+    @apply bg-blue-500/20 border-blue-500/50 text-blue-400;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
   }
 
-  /* Mariana Castilho clean interface elements */
+  /* Upload Progress - Inspired by Emil Kowalski's modern aesthetics */
   .upload-progress {
-    @apply w-full bg-neutral-800/50 rounded-full h-1.5 overflow-hidden;
+    @apply bg-neutral-900/50 rounded-2xl border border-neutral-800/30 p-4;
     backdrop-filter: blur(10px);
   }
 
   .upload-progress-bar {
-    @apply bg-gradient-to-r from-neutral-400 to-neutral-50 h-full rounded-full;
-    @apply transition-all duration-300 ease-out;
+    @apply w-full h-2 bg-neutral-800/50 rounded-full overflow-hidden;
   }
 
-  /* Michael Bierut inspired information hierarchy */
+  /* Track Info - Inspired by Mariana Castilho's human-centered design */
   .track-info {
-    @apply bg-neutral-900/30 backdrop-blur-xl rounded-2xl border border-neutral-800/30;
+    @apply bg-neutral-900/30 backdrop-blur-xl rounded-3xl border border-neutral-800/30;
     background: linear-gradient(
       135deg,
       rgba(255, 255, 255, 0.02) 0%,
-      rgba(255, 255, 255, 0.005) 100%
+      rgba(255, 255, 255, 0.01) 100%
     );
   }
-}
 
-/* Smooth page transitions */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+  /* Animations - Inspired by Jordan Singer's thoughtful micro-animations */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  .animate-fade-in {
+    animation: fadeIn 0.6s ease-out forwards;
   }
-}
 
-.animate-fade-in {
-  animation: fadeIn 0.6s ease-out;
-}
+  .hover-lift {
+    @apply transition-all duration-300 ease-out;
+  }
 
-/* Subtle hover effects */
-.hover-lift {
-  @apply transition-transform duration-200 ease-out;
-}
+  .hover-lift:hover {
+    @apply scale-[1.02] shadow-2xl shadow-neutral-900/20;
+  }
 
-.hover-lift:hover {
-  transform: translateY(-1px);
-}
+  /* Text Utilities - Inspired by Michael Beirut's typography */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 
-/* Line clamp utilities */
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 
-.line-clamp-3 {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* Gallery Grid Layout */
-.masonry-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 24px;
-  margin-bottom: 2rem;
-}
-
-@media (min-width: 768px) {
+  /* Grid System - Inspired by MDS's systematic design */
   .masonry-grid {
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 32px;
+    @apply grid grid-cols-1 gap-6;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   }
-}
 
-/* Track Card Components */
-.track-card {
-  @apply bg-neutral-900/30 backdrop-blur-xl rounded-2xl border border-neutral-800/30 overflow-hidden;
-  @apply transition-all duration-300 ease-out;
-  @apply hover:border-neutral-700/50 hover:bg-neutral-900/50;
-  @apply hover:scale-[1.02] hover:shadow-2xl;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.03) 0%,
-    rgba(255, 255, 255, 0.01) 100%
-  );
-}
-
-.track-artwork {
-  @apply relative w-full aspect-square overflow-hidden;
-  @apply bg-gradient-to-br from-neutral-800 to-neutral-900;
-}
-
-.track-overlay {
-  @apply absolute inset-0 bg-black/20 backdrop-blur-sm;
-  @apply flex items-center justify-center;
-  @apply opacity-0 group-hover:opacity-100;
-  @apply transition-all duration-300 ease-out;
-}
-
-.play-button-mini {
-  @apply w-12 h-12 bg-white/90 text-neutral-900 rounded-full;
-  @apply flex items-center justify-center;
-  @apply hover:bg-white hover:scale-110;
-  @apply transition-all duration-200 ease-out;
-  @apply shadow-lg;
-  backdrop-filter: blur(10px);
-}
-
-.track-details {
-  @apply p-6;
-}
-
-.track-title {
-  @apply text-lg font-medium mb-2 tracking-tight;
-  @apply group-hover:text-neutral-100 transition-colors;
-  font-variation-settings: "wght" 500;
-  letter-spacing: -0.01em;
-}
-
-.track-artist {
-  @apply text-secondary text-sm mb-3;
-  @apply group-hover:text-neutral-300 transition-colors;
-  font-variation-settings: "wght" 400;
-}
-
-.track-description {
-  @apply text-neutral-400 text-sm mb-4 line-clamp-2 leading-relaxed;
-}
-
-.track-tag {
-  @apply px-3 py-1.5 bg-neutral-800/50 rounded-full text-xs text-neutral-300;
-  @apply hover:bg-neutral-800 transition-colors;
-  @apply border border-neutral-700/30;
-  font-variation-settings: "wght" 450;
-  backdrop-filter: blur(10px);
-}
-
-.track-tag-more {
-  @apply px-3 py-1.5 text-xs text-neutral-500;
-  font-variation-settings: "wght" 400;
-}
-
-.track-metadata {
-  @apply pt-3 border-t border-neutral-800/50;
-}
-
-/* Persistent Mini Player */
-.mini-player {
-  @apply fixed bottom-0 left-0 right-0 z-50;
-  @apply bg-neutral-900/95 backdrop-blur-xl border-t border-neutral-800/50;
-  @apply transition-all duration-300 ease-out;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.1) 0%,
-    rgba(0, 0, 0, 0.95) 100%
-  );
-}
-
-.mini-player-content {
-  @apply flex items-center gap-4 p-4 max-w-7xl mx-auto;
-  @apply h-20;
-}
-
-.mini-player-info {
-  @apply flex items-center gap-3 min-w-0 flex-shrink-0;
-  @apply w-48;
-}
-
-.mini-player-artwork {
-  @apply w-12 h-12 rounded-lg overflow-hidden flex-shrink-0;
-  @apply bg-gradient-to-br from-neutral-800 to-neutral-900;
-}
-
-.mini-player-details {
-  @apply min-w-0 flex-1;
-}
-
-.mini-player-title {
-  @apply text-sm font-medium text-neutral-100 truncate;
-  font-variation-settings: "wght" 500;
-  letter-spacing: -0.01em;
-}
-
-.mini-player-artist {
-  @apply text-xs text-neutral-400 truncate;
-  font-variation-settings: "wght" 400;
-}
-
-.mini-player-controls {
-  @apply flex items-center gap-2 flex-shrink-0;
-}
-
-.mini-control-btn {
-  @apply w-8 h-8 flex items-center justify-center rounded-full;
-  @apply text-neutral-400 hover:text-neutral-100;
-  @apply hover:bg-neutral-800/50 transition-all duration-200;
-  @apply disabled:opacity-30 disabled:cursor-not-allowed;
-}
-
-.mini-play-button {
-  @apply w-10 h-10 bg-neutral-50 text-neutral-900 rounded-full;
-  @apply flex items-center justify-center;
-  @apply hover:bg-neutral-100 hover:scale-105;
-  @apply transition-all duration-200 ease-out;
-  @apply shadow-lg;
-}
-
-.mini-player-waveform {
-  @apply flex-1 h-10 min-w-0;
-  @apply flex items-center;
-}
-
-.mini-progress-bar {
-  @apply w-full h-1 bg-neutral-800 rounded-full overflow-hidden;
-}
-
-.mini-progress-fill {
-  @apply h-full bg-gradient-to-r from-neutral-400 to-neutral-100 rounded-full;
-  @apply transition-all duration-300 ease-out;
-}
-
-.mini-player-time {
-  @apply flex-shrink-0 w-24 text-right;
-}
-
-/* Search & Filters */
-.search-filters {
-  @apply mb-8;
-}
-
-.search-bar-container {
-  @apply flex items-center gap-4 mb-4;
-}
-
-.search-bar {
-  @apply relative flex-1 max-w-md;
-}
-
-.search-input {
-  @apply w-full pl-12 pr-10 py-3 bg-neutral-900/50 backdrop-blur-xl rounded-2xl border border-neutral-800/50;
-  @apply text-neutral-100 placeholder:text-neutral-500;
-  @apply focus:outline-none focus:border-neutral-600 focus:bg-neutral-900/70;
-  @apply transition-all duration-200;
-  font-variation-settings: "wght" 400;
-  letter-spacing: -0.01em;
-}
-
-.search-icon {
-  @apply absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-neutral-400;
-}
-
-.search-clear {
-  @apply absolute right-3 top-1/2 transform -translate-y-1/2;
-  @apply w-6 h-6 flex items-center justify-center rounded-full;
-  @apply text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800;
-  @apply transition-all duration-200;
-}
-
-.filter-toggle {
-  @apply flex items-center gap-2 px-4 py-3 bg-neutral-900/50 backdrop-blur-xl rounded-2xl border border-neutral-800/50;
-  @apply text-neutral-100 hover:border-neutral-600 hover:bg-neutral-900/70;
-  @apply transition-all duration-200;
-  @apply relative;
-  font-variation-settings: "wght" 450;
-  letter-spacing: -0.01em;
-}
-
-.filter-badge {
-  @apply absolute -top-2 -right-2 min-w-[20px] h-5 px-1.5;
-  @apply bg-neutral-50 text-neutral-900 text-xs font-medium rounded-full;
-  @apply flex items-center justify-center;
-  font-variation-settings: "wght" 600;
-}
-
-.filters-panel {
-  @apply bg-neutral-900/30 backdrop-blur-xl rounded-2xl border border-neutral-800/30 p-6;
-  @apply animate-fade-in;
-}
-
-.filters-grid {
-  @apply grid grid-cols-1 md:grid-cols-3 gap-4 mb-6;
-}
-
-.filter-group {
-  @apply space-y-2;
-}
-
-.filter-label {
-  @apply text-sm font-medium text-neutral-300;
-  font-variation-settings: "wght" 500;
-  letter-spacing: -0.01em;
-}
-
-.filter-select {
-  @apply w-full px-3 py-2 bg-neutral-800/50 backdrop-blur-xl rounded-xl border border-neutral-700/50;
-  @apply text-neutral-100 text-sm;
-  @apply focus:outline-none focus:border-neutral-600 focus:bg-neutral-800/70;
-  @apply transition-all duration-200;
-  font-variation-settings: "wght" 400;
-}
-
-.filter-select option {
-  @apply bg-neutral-900 text-neutral-100;
-}
-
-.tags-grid {
-  @apply flex flex-wrap gap-2;
-}
-
-.tag-filter {
-  @apply px-3 py-1.5 bg-neutral-800/50 rounded-full text-xs text-neutral-300;
-  @apply hover:bg-neutral-800 hover:text-neutral-100;
-  @apply border border-neutral-700/30;
-  @apply transition-all duration-200;
-  font-variation-settings: "wght" 450;
-}
-
-.tag-filter.active {
-  @apply bg-neutral-50 text-neutral-900 border-neutral-50;
-}
-
-.clear-filters {
-  @apply px-4 py-2 text-sm text-neutral-400 hover:text-neutral-100;
-  @apply hover:bg-neutral-800/50 rounded-xl;
-  @apply transition-all duration-200;
-  font-variation-settings: "wght" 450;
-}
-
-.results-summary {
-  @apply text-sm text-neutral-400 flex items-center gap-2;
-  font-variation-settings: "wght" 400;
-}
-
-.filter-indicator {
-  @apply text-neutral-300;
-}
-
-/* Quick Stats Cards */
-.stat-card {
-  @apply bg-neutral-900/30 backdrop-blur-xl rounded-2xl border border-neutral-800/30 p-6;
-  @apply text-center transition-all duration-200 ease-out;
-  @apply hover:bg-neutral-900/50 hover:border-neutral-700/50;
-  @apply hover:scale-[1.02];
-}
-
-.stat-number {
-  @apply text-3xl font-light text-neutral-50 mb-2;
-  font-variation-settings: "wght" 300;
-  letter-spacing: -0.02em;
-}
-
-.stat-label {
-  @apply text-sm text-neutral-400;
-  font-variation-settings: "wght" 400;
-  letter-spacing: -0.01em;
-}
-
-/* Recent Track Cards */
-.recent-track-card {
-  @apply transition-all duration-200 ease-out;
-  @apply hover:scale-[1.02];
-}
-
-.recent-track-artwork {
-  @apply overflow-hidden rounded-xl;
-  @apply transition-all duration-200 ease-out;
-}
-
-.recent-track-card:hover .recent-track-artwork {
-  @apply shadow-lg;
-}
-
-/* Social Share Buttons */
-.social-share-btn {
-  @apply flex items-center gap-3 px-3 py-2 rounded-xl text-sm;
-  @apply transition-all duration-200 ease-out;
-  @apply hover:bg-neutral-800/50 hover:scale-[1.02];
-  font-variation-settings: "wght" 450;
-  letter-spacing: -0.01em;
-}
-
-.social-share-btn.twitter {
-  @apply text-blue-400 hover:text-blue-300;
-}
-
-.social-share-btn.facebook {
-  @apply text-blue-600 hover:text-blue-500;
-}
-
-.social-share-btn.linkedin {
-  @apply text-blue-700 hover:text-blue-600;
-}
-
-.social-share-btn.copy {
-  @apply text-neutral-300 hover:text-neutral-100;
-}
-
-/* Trending Badge */
-.trending-badge {
-  @apply flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-medium rounded-full;
-  @apply shadow-lg backdrop-blur-sm;
-  font-variation-settings: "wght" 600;
-  letter-spacing: -0.01em;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
+  @media (min-width: 768px) {
+    .masonry-grid {
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 32px;
+    }
   }
-  50% {
-    opacity: 0.8;
+
+  /* Track Card Components - Inspired by Benji Taylor's modern minimalism */
+  .track-card {
+    @apply bg-neutral-900/30 backdrop-blur-xl rounded-3xl border border-neutral-800/30 overflow-hidden;
+    @apply transition-all duration-500 ease-out;
+    @apply hover:border-neutral-700/50 hover:bg-neutral-900/50;
+    @apply hover:scale-[1.02] hover:shadow-2xl hover:shadow-neutral-900/20;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      rgba(255, 255, 255, 0.01) 100%
+    );
+  }
+
+  .track-artwork {
+    @apply relative w-full aspect-square overflow-hidden;
+    @apply bg-gradient-to-br from-neutral-800 to-neutral-900;
+  }
+
+  .track-overlay {
+    @apply absolute inset-0 bg-black/20 backdrop-blur-sm;
+    @apply flex items-center justify-center;
+    @apply opacity-0 group-hover:opacity-100;
+    @apply transition-all duration-500 ease-out;
+  }
+
+  .play-button-mini {
+    @apply w-14 h-14 bg-neutral-100 text-neutral-900 rounded-full;
+    @apply flex items-center justify-center;
+    @apply hover:bg-neutral-200 hover:scale-110;
+    @apply transition-all duration-300 ease-out;
+    @apply shadow-xl shadow-neutral-900/20;
+    backdrop-filter: blur(10px);
+  }
+
+  .track-details {
+    @apply p-8;
+  }
+
+  .track-title {
+    @apply text-xl font-medium mb-3 tracking-tight;
+    @apply group-hover:text-neutral-100 transition-colors duration-300;
+    font-variation-settings: "wght" 500;
+    letter-spacing: -0.02em;
+    line-height: 1.3;
+  }
+
+  .track-artist {
+    @apply text-secondary text-base mb-4;
+    @apply group-hover:text-neutral-300 transition-colors duration-300;
+    font-variation-settings: "wght" 400;
+    letter-spacing: -0.01em;
+  }
+
+  .track-description {
+    @apply text-neutral-400 text-sm mb-6 line-clamp-2 leading-relaxed;
+    font-variation-settings: "wght" 400;
+  }
+
+  .track-tag {
+    @apply px-4 py-2 bg-neutral-800/50 rounded-2xl text-sm text-neutral-300;
+    @apply hover:bg-neutral-800 transition-colors duration-200;
+    @apply border border-neutral-700/30;
+    font-variation-settings: "wght" 450;
+    backdrop-filter: blur(10px);
+  }
+
+  .track-tag-more {
+    @apply px-4 py-2 text-sm text-neutral-500;
+    font-variation-settings: "wght" 400;
+  }
+
+  .track-metadata {
+    @apply pt-6 border-t border-neutral-800/50;
+  }
+
+  /* Persistent Mini Player - Inspired by Jony Ive's seamless integration */
+  .mini-player {
+    @apply fixed bottom-0 left-0 right-0 z-50;
+    @apply bg-neutral-900/95 backdrop-blur-xl border-t border-neutral-800/30;
+    @apply transition-all duration-500 ease-out;
+    background: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.1) 0%,
+      rgba(0, 0, 0, 0.95) 100%
+    );
+  }
+
+  .mini-player-content {
+    @apply flex items-center gap-6 p-6 max-w-7xl mx-auto;
+    @apply h-24;
+  }
+
+  .mini-player-info {
+    @apply flex items-center gap-4 min-w-0 flex-shrink-0;
+    @apply w-56;
+  }
+
+  .mini-player-artwork {
+    @apply w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0;
+    @apply bg-gradient-to-br from-neutral-800 to-neutral-900;
+  }
+
+  .mini-player-details {
+    @apply min-w-0 flex-1;
+  }
+
+  .mini-player-title {
+    @apply text-base font-medium text-neutral-100 truncate;
+    font-variation-settings: "wght" 500;
+    letter-spacing: -0.01em;
+  }
+
+  .mini-player-artist {
+    @apply text-sm text-neutral-400 truncate;
+    font-variation-settings: "wght" 400;
+  }
+
+  .mini-player-controls {
+    @apply flex items-center gap-3 flex-shrink-0;
+  }
+
+  .mini-control-btn {
+    @apply w-10 h-10 flex items-center justify-center rounded-2xl;
+    @apply text-neutral-400 hover:text-neutral-100;
+    @apply hover:bg-neutral-800/50 transition-all duration-300 ease-out;
+    @apply disabled:opacity-30 disabled:cursor-not-allowed;
+  }
+
+  .mini-play-button {
+    @apply w-12 h-12 bg-neutral-100 text-neutral-900 rounded-full;
+    @apply flex items-center justify-center;
+    @apply hover:bg-neutral-200 hover:scale-105;
+    @apply transition-all duration-300 ease-out;
+    @apply shadow-xl shadow-neutral-900/20;
+  }
+
+  .mini-player-waveform {
+    @apply flex-1 h-12 min-w-0;
+    @apply flex items-center;
+  }
+
+  .mini-progress-bar {
+    @apply w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden;
+  }
+
+  .mini-progress-fill {
+    @apply h-full bg-gradient-to-r from-neutral-400 to-neutral-100 rounded-full;
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .mini-player-time {
+    @apply flex-shrink-0 w-28 text-right;
+  }
+
+  /* Search & Filters - Inspired by Rauno Freiberg's clean lines */
+  .search-filters {
+    @apply mb-12;
+  }
+
+  .search-bar-container {
+    @apply flex items-center gap-6 mb-6;
+  }
+
+  .search-bar {
+    @apply relative flex-1 max-w-lg;
+  }
+
+  .search-input {
+    @apply w-full pl-14 pr-12 py-4 bg-neutral-900/50 backdrop-blur-xl rounded-3xl border border-neutral-800/30;
+    @apply text-neutral-100 placeholder:text-neutral-500;
+    @apply focus:outline-none focus:border-neutral-600 focus:bg-neutral-900/70;
+    @apply transition-all duration-300 ease-out;
+    font-variation-settings: "wght" 400;
+    letter-spacing: -0.01em;
+  }
+
+  .search-icon {
+    @apply absolute left-5 top-1/2 transform -translate-y-1/2 w-6 h-6 text-neutral-400;
+  }
+
+  .search-clear {
+    @apply absolute right-4 top-1/2 transform -translate-y-1/2;
+    @apply w-8 h-8 flex items-center justify-center rounded-2xl;
+    @apply text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800;
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .filter-toggle {
+    @apply flex items-center gap-3 px-6 py-4 bg-neutral-900/50 backdrop-blur-xl rounded-3xl border border-neutral-800/30;
+    @apply text-neutral-100 hover:border-neutral-600 hover:bg-neutral-900/70;
+    @apply transition-all duration-300 ease-out;
+    @apply relative;
+    font-variation-settings: "wght" 450;
+    letter-spacing: -0.01em;
+  }
+
+  .filter-badge {
+    @apply absolute -top-2 -right-2 min-w-[24px] h-6 px-2;
+    @apply bg-neutral-100 text-neutral-900 text-xs font-medium rounded-full;
+    @apply flex items-center justify-center;
+    font-variation-settings: "wght" 600;
+  }
+
+  .filters-panel {
+    @apply bg-neutral-900/30 backdrop-blur-xl rounded-3xl border border-neutral-800/30 p-8;
+    @apply animate-fade-in;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.02) 0%,
+      rgba(255, 255, 255, 0.01) 100%
+    );
+  }
+
+  .filters-grid {
+    @apply grid grid-cols-1 md:grid-cols-3 gap-6 mb-8;
+  }
+
+  .filter-group {
+    @apply space-y-3;
+  }
+
+  .filter-label {
+    @apply text-sm font-medium text-neutral-300;
+    font-variation-settings: "wght" 500;
+    letter-spacing: -0.01em;
+  }
+
+  .filter-select {
+    @apply w-full px-4 py-3 bg-neutral-800/50 backdrop-blur-xl rounded-2xl border border-neutral-700/30;
+    @apply text-neutral-100 text-sm;
+    @apply focus:outline-none focus:border-neutral-600 focus:bg-neutral-800/70;
+    @apply transition-all duration-300 ease-out;
+    font-variation-settings: "wght" 400;
+  }
+
+  .filter-select option {
+    @apply bg-neutral-900 text-neutral-100;
+  }
+
+  .tags-grid {
+    @apply flex flex-wrap gap-3;
+  }
+
+  .tag-filter {
+    @apply px-4 py-2 bg-neutral-800/50 rounded-2xl text-sm text-neutral-300;
+    @apply hover:bg-neutral-800 hover:text-neutral-100;
+    @apply border border-neutral-700/30;
+    @apply transition-all duration-300 ease-out;
+    font-variation-settings: "wght" 450;
+  }
+
+  .tag-filter.active {
+    @apply bg-neutral-100 text-neutral-900 border-neutral-100;
+  }
+
+  .clear-filters {
+    @apply px-6 py-3 text-sm text-neutral-400 hover:text-neutral-100;
+    @apply hover:bg-neutral-800/50 rounded-2xl;
+    @apply transition-all duration-300 ease-out;
+    font-variation-settings: "wght" 450;
+  }
+
+  .results-summary {
+    @apply text-sm text-neutral-400 flex items-center gap-3;
+    font-variation-settings: "wght" 400;
+  }
+
+  .filter-indicator {
+    @apply text-neutral-300;
+  }
+
+  /* Quick Stats Cards - Inspired by Jason Yuan's sophisticated minimalism */
+  .stat-card {
+    @apply bg-neutral-900/30 backdrop-blur-xl rounded-3xl border border-neutral-800/30 p-8;
+    @apply text-center transition-all duration-500 ease-out;
+    @apply hover:bg-neutral-900/50 hover:border-neutral-700/50;
+    @apply hover:scale-[1.02] hover:shadow-2xl hover:shadow-neutral-900/20;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.02) 0%,
+      rgba(255, 255, 255, 0.01) 100%
+    );
+  }
+
+  .stat-number {
+    @apply text-4xl font-light text-neutral-50 mb-3;
+    font-variation-settings: "wght" 300;
+    letter-spacing: -0.03em;
+  }
+
+  .stat-label {
+    @apply text-sm text-neutral-400;
+    font-variation-settings: "wght" 400;
+    letter-spacing: -0.01em;
+  }
+
+  /* Recent Track Cards */
+  .recent-track-card {
+    @apply transition-all duration-500 ease-out;
+    @apply hover:scale-[1.02];
+  }
+
+  .recent-track-artwork {
+    @apply overflow-hidden rounded-2xl;
+    @apply transition-all duration-500 ease-out;
+  }
+
+  .recent-track-card:hover .recent-track-artwork {
+    @apply shadow-2xl shadow-neutral-900/20;
+  }
+
+  /* Social Share Buttons */
+  .social-share-btn {
+    @apply flex items-center gap-4 px-4 py-3 rounded-2xl text-sm;
+    @apply transition-all duration-300 ease-out;
+    @apply hover:bg-neutral-800/50 hover:scale-[1.02];
+    font-variation-settings: "wght" 450;
+    letter-spacing: -0.01em;
+  }
+
+  .social-share-btn.twitter {
+    @apply text-blue-400 hover:text-blue-300;
+  }
+
+  .social-share-btn.facebook {
+    @apply text-blue-600 hover:text-blue-500;
+  }
+
+  .social-share-btn.linkedin {
+    @apply text-blue-700 hover:text-blue-600;
+  }
+
+  .social-share-btn.copy {
+    @apply text-neutral-300 hover:text-neutral-100;
+  }
+
+  /* Trending Badge */
+  .trending-badge {
+    @apply flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-medium rounded-full;
+    @apply shadow-xl backdrop-blur-sm;
+    font-variation-settings: "wght" 600;
+    letter-spacing: -0.01em;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
+
+  /* Playlist Styles - Inspired by Dieter Rams' essential functionality */
+  .playlist-manager {
+    @apply w-full;
+  }
+
+  .playlist-card {
+    @apply p-8 bg-neutral-900/30 backdrop-blur-xl rounded-3xl border border-neutral-800/30;
+    @apply hover:border-neutral-700/50 transition-all duration-500 ease-out;
+    @apply hover:shadow-2xl hover:shadow-neutral-900/20 hover:scale-[1.02];
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.02) 0%,
+      rgba(255, 255, 255, 0.01) 100%
+    );
+  }
+
+  .playlist-title {
+    @apply text-xl font-medium text-neutral-100 mb-2 truncate;
+    font-variation-settings: "wght" 500;
+    letter-spacing: -0.01em;
+  }
+
+  .playlist-description {
+    @apply text-sm text-neutral-400 line-clamp-2;
+    font-variation-settings: "wght" 400;
+  }
+
+  .collaborative-badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 text-blue-400 text-xs rounded-full border border-blue-500/30;
+    font-variation-settings: "wght" 500;
+  }
+
+  /* Form Styles - Inspired by Jeremy Blake's precise design */
+  .form-input {
+    @apply w-full px-6 py-4 bg-neutral-800/50 border border-neutral-700/30 rounded-2xl text-neutral-100 placeholder-neutral-500;
+    @apply focus:outline-none focus:ring-2 focus:ring-neutral-100/20 focus:border-neutral-600 focus:bg-neutral-800/70;
+    @apply transition-all duration-300 ease-out;
+    font-variation-settings: "wght" 400;
+    letter-spacing: -0.01em;
+  }
+
+  .form-textarea {
+    @apply w-full px-6 py-4 bg-neutral-800/50 border border-neutral-700/30 rounded-2xl text-neutral-100 placeholder-neutral-500;
+    @apply focus:outline-none focus:ring-2 focus:ring-neutral-100/20 focus:border-neutral-600 focus:bg-neutral-800/70;
+    @apply transition-all duration-300 ease-out resize-none;
+    font-variation-settings: "wght" 400;
+    letter-spacing: -0.01em;
+  }
+
+  .form-checkbox {
+    @apply w-5 h-5 bg-neutral-800/50 border border-neutral-700/30 rounded text-blue-500;
+    @apply focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-0 focus:ring-offset-neutral-950;
+    @apply transition-all duration-200 ease-out;
+  }
+
+  /* Enhanced Comments Styles - Inspired by Mariana Castilho's human-centered design */
+  .comment-category {
+    @apply px-3 py-1.5 rounded-xl text-xs border;
+    font-variation-settings: "wght" 500;
+  }
+
+  .comment-category.feedback {
+    @apply text-blue-400 bg-blue-500/10 border-blue-500/30;
+  }
+
+  .comment-category.question {
+    @apply text-yellow-400 bg-yellow-500/10 border-yellow-500/30;
+  }
+
+  .comment-category.suggestion {
+    @apply text-green-400 bg-green-500/10 border-green-500/30;
+  }
+
+  .comment-category.bug {
+    @apply text-red-400 bg-red-500/10 border-red-500/30;
+  }
+
+  .comment-category.general {
+    @apply text-neutral-400 bg-neutral-500/10 border-neutral-500/30;
+  }
+
+  .comment-reactions {
+    @apply flex items-center gap-3;
+  }
+
+  .comment-reaction-btn {
+    @apply flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800/50 hover:bg-neutral-700/50 rounded-xl text-xs text-neutral-400;
+    @apply transition-all duration-300 ease-out;
+    font-variation-settings: "wght" 450;
+  }
+
+  .comment-reaction-btn.like:hover {
+    @apply text-red-400;
+  }
+
+  .comment-reaction-btn.helpful:hover {
+    @apply text-green-400;
+  }
+
+  .comment-reaction-btn.agree:hover {
+    @apply text-blue-400;
+  }
+
+  .comment-reply {
+    @apply ml-10 border-l-2 border-l-blue-500/20;
+  }
+
+  .comment-reply-form {
+    @apply mb-4 p-4 bg-neutral-800/30 rounded-2xl;
+  }
+
+  .comment-reply-form textarea {
+    @apply w-full px-4 py-3 bg-neutral-900/50 border border-neutral-700/30 rounded-xl text-sm placeholder:text-neutral-500;
+    @apply focus:outline-none focus:border-neutral-600 transition-colors duration-200 resize-none;
+    font-variation-settings: "wght" 400;
+  }
+
+  .comment-reply-actions {
+    @apply flex gap-3 mt-3;
+  }
+
+  .comment-reply-actions button {
+    @apply text-xs;
+  }
+
+  .comment-reply-actions .reply-btn {
+    @apply btn-primary disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .comment-reply-actions .cancel-btn {
+    @apply btn-secondary;
+  }
+
+  .comment-reply-toggle {
+    @apply text-xs text-neutral-400 hover:text-neutral-300 transition-colors duration-200;
+    font-variation-settings: "wght" 450;
+  }
+
+  .comment-reply-btn {
+    @apply text-xs text-blue-400 hover:text-blue-300 transition-colors duration-200;
+    font-variation-settings: "wght" 450;
+  }
+
+  .comment-timestamp {
+    @apply px-3 py-1.5 bg-blue-500/10 border border-blue-500/30 rounded-xl text-xs text-blue-400;
+    @apply hover:text-blue-300 hover:bg-blue-500/20 transition-all duration-300 ease-out flex items-center gap-1.5;
+    font-variation-settings: "wght" 500;
+  }
+
+  .comment-timestamp:hover {
+    @apply text-blue-300 bg-blue-500/20;
   }
 }

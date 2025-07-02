@@ -9,6 +9,14 @@ interface Comment {
   message: string;
   timestamp: number;
   audioTimestamp?: number;
+  category?: "feedback" | "question" | "suggestion" | "bug" | "general";
+  reactions?: {
+    like?: number;
+    helpful?: number;
+    agree?: number;
+  };
+  replies?: Comment[];
+  parentId?: string;
 }
 
 interface CommentsData {
@@ -48,7 +56,8 @@ export async function POST(
   { params }: { params: { slug: string } }
 ) {
   try {
-    const { author, message, audioTimestamp } = await request.json();
+    const { author, message, audioTimestamp, category, parentId } =
+      await request.json();
 
     if (!author || !message) {
       return NextResponse.json(
@@ -80,6 +89,16 @@ export async function POST(
       );
     }
 
+    // Validate category if provided
+    if (
+      category &&
+      !["feedback", "question", "suggestion", "bug", "general"].includes(
+        category
+      )
+    ) {
+      return NextResponse.json({ error: "Invalid category" }, { status: 400 });
+    }
+
     const commentsPath = path.join(
       process.cwd(),
       "public",
@@ -103,11 +122,39 @@ export async function POST(
       message: message.trim(),
       timestamp: Date.now(),
       audioTimestamp: audioTimestamp,
+      category: category || "feedback",
+      reactions: {
+        like: 0,
+        helpful: 0,
+        agree: 0,
+      },
+      replies: [],
     };
 
-    commentsData.comments.push(newComment);
+    if (parentId) {
+      // This is a reply - add it to the parent comment
+      const parentComment = commentsData.comments.find(
+        (c) => c.id === parentId
+      );
+      if (!parentComment) {
+        return NextResponse.json(
+          { error: "Parent comment not found" },
+          { status: 404 }
+        );
+      }
 
-    // Sort comments by audio timestamp first, then by post timestamp
+      if (!parentComment.replies) {
+        parentComment.replies = [];
+      }
+
+      newComment.parentId = parentId;
+      parentComment.replies!.push(newComment);
+    } else {
+      // This is a top-level comment
+      commentsData.comments.push(newComment);
+    }
+
+    // Sort top-level comments by audio timestamp first, then by post timestamp
     commentsData.comments.sort((a, b) => {
       if (a.audioTimestamp !== undefined && b.audioTimestamp !== undefined) {
         return a.audioTimestamp - b.audioTimestamp;
@@ -163,11 +210,22 @@ export async function DELETE(
       );
     }
 
-    // Find and remove the comment
+    // Find and remove the comment (including from replies)
     const initialLength = commentsData.comments.length;
+
+    // Remove from top-level comments
     commentsData.comments = commentsData.comments.filter(
       (comment) => comment.id !== commentId
     );
+
+    // Remove from replies
+    commentsData.comments.forEach((comment) => {
+      if (comment.replies) {
+        comment.replies = comment.replies.filter(
+          (reply) => reply.id !== commentId
+        );
+      }
+    });
 
     if (commentsData.comments.length === initialLength) {
       return NextResponse.json({ error: "Comment not found" }, { status: 404 });

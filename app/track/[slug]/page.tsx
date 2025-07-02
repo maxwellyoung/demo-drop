@@ -5,6 +5,7 @@ import ShareButton from "@/components/ShareButton";
 import ReactionsPanel from "@/components/ReactionsPanel";
 import MetadataEditor from "@/components/MetadataEditor";
 import TrackInteractions from "@/components/TrackInteractions";
+import TrackActions from "@/components/TrackActions";
 
 interface TrackMetadata {
   slug: string;
@@ -111,10 +112,13 @@ export default async function TrackPage({
       />
 
       {/* Actions - Jordan Singer inspired layout */}
-      <div className="flex flex-col sm:flex-row justify-center items-center gap-8 my-8">
-        <ShareButton url={shareUrl} title={metadata.title} />
-        <ReactionsPanel slug={metadata.slug} reactions={metadata.reactions} />
-      </div>
+      <TrackActions
+        shareUrl={shareUrl}
+        title={metadata.title}
+        artist={metadata.artist}
+        trackSlug={metadata.slug}
+        reactions={metadata.reactions}
+      />
 
       {/* Track Metadata Editor */}
       <MetadataEditor trackSlug={metadata.slug} />

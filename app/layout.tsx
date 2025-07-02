@@ -37,6 +37,13 @@ export default function RootLayout({
               >
                 All Tracks
               </Link>
+              <span className="text-neutral-700">•</span>
+              <Link
+                href="/playlists"
+                className="text-sm text-neutral-400 hover:text-neutral-200 transition-colors duration-200"
+              >
+                Playlists
+              </Link>
             </div>
           </nav>
 
