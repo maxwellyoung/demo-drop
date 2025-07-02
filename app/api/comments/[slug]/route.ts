@@ -6,8 +6,9 @@ import { v4 as uuidv4 } from "uuid";
 interface Comment {
   id: string;
   author: string;
-  content: string;
-  timestamp: string;
+  message: string;
+  timestamp: number;
+  audioTimestamp?: number;
 }
 
 interface CommentsData {
@@ -28,16 +29,15 @@ export async function GET(
 
     try {
       const data = await readFile(commentsPath, "utf-8");
-      const commentsData: CommentsData = JSON.parse(data);
-      return NextResponse.json(commentsData);
+      return NextResponse.json(JSON.parse(data));
     } catch (error) {
-      // File doesn't exist yet, return empty comments
+      // File doesn't exist, return empty comments
       return NextResponse.json({ comments: [] });
     }
   } catch (error) {
-    console.error("Comments fetch error:", error);
+    console.error("Error reading comments:", error);
     return NextResponse.json(
-      { error: "Failed to fetch comments" },
+      { error: "Failed to read comments" },
       { status: 500 }
     );
   }
@@ -48,18 +48,37 @@ export async function POST(
   { params }: { params: { slug: string } }
 ) {
   try {
-    const { author, content } = await request.json();
+    const { author, message, audioTimestamp } = await request.json();
 
-    if (!author?.trim() || !content?.trim()) {
+    if (!author || !message) {
       return NextResponse.json(
-        { error: "Author and content are required" },
+        { error: "Author and message are required" },
         { status: 400 }
       );
     }
 
-    // Sanitize inputs
-    const sanitizedAuthor = author.trim().substring(0, 50);
-    const sanitizedContent = content.trim().substring(0, 500);
+    // Validate input lengths
+    if (author.length > 50) {
+      return NextResponse.json(
+        { error: "Author name too long" },
+        { status: 400 }
+      );
+    }
+
+    if (message.length > 500) {
+      return NextResponse.json({ error: "Message too long" }, { status: 400 });
+    }
+
+    // Validate audio timestamp if provided
+    if (
+      audioTimestamp !== undefined &&
+      (audioTimestamp < 0 || audioTimestamp > 3600)
+    ) {
+      return NextResponse.json(
+        { error: "Invalid audio timestamp" },
+        { status: 400 }
+      );
+    }
 
     const commentsPath = path.join(
       process.cwd(),
@@ -68,33 +87,44 @@ export async function POST(
       `${params.slug}-comments.json`
     );
 
-    // Read existing comments or create new structure
+    // Read existing comments
     let commentsData: CommentsData = { comments: [] };
     try {
       const existingData = await readFile(commentsPath, "utf-8");
       commentsData = JSON.parse(existingData);
     } catch (error) {
-      // File doesn't exist, use empty structure
+      // File doesn't exist, start with empty array
     }
 
-    // Add new comment
+    // Create new comment
     const newComment: Comment = {
       id: uuidv4(),
-      author: sanitizedAuthor,
-      content: sanitizedContent,
-      timestamp: new Date().toISOString(),
+      author: author.trim(),
+      message: message.trim(),
+      timestamp: Date.now(),
+      audioTimestamp: audioTimestamp,
     };
 
-    commentsData.comments.unshift(newComment); // Add to beginning for newest first
+    commentsData.comments.push(newComment);
 
-    // Save updated comments
+    // Sort comments by audio timestamp first, then by post timestamp
+    commentsData.comments.sort((a, b) => {
+      if (a.audioTimestamp !== undefined && b.audioTimestamp !== undefined) {
+        return a.audioTimestamp - b.audioTimestamp;
+      }
+      if (a.audioTimestamp !== undefined) return -1;
+      if (b.audioTimestamp !== undefined) return 1;
+      return a.timestamp - b.timestamp;
+    });
+
+    // Write back to file
     await writeFile(commentsPath, JSON.stringify(commentsData, null, 2));
 
-    return NextResponse.json(commentsData);
+    return NextResponse.json(newComment);
   } catch (error) {
-    console.error("Comment submission error:", error);
+    console.error("Error saving comment:", error);
     return NextResponse.json(
-      { error: "Failed to submit comment" },
+      { error: "Failed to save comment" },
       { status: 500 }
     );
   }

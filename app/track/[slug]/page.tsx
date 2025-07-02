@@ -23,6 +23,14 @@ interface TrackMetadata {
   };
 }
 
+interface Comment {
+  id: string;
+  author: string;
+  message: string;
+  timestamp: number;
+  audioTimestamp?: number;
+}
+
 async function getTrackMetadata(slug: string): Promise<TrackMetadata | null> {
   try {
     const metadataPath = path.join(
@@ -38,12 +46,29 @@ async function getTrackMetadata(slug: string): Promise<TrackMetadata | null> {
   }
 }
 
+async function getTrackComments(slug: string): Promise<Comment[]> {
+  try {
+    const commentsPath = path.join(
+      process.cwd(),
+      "public",
+      "uploads",
+      `${slug}-comments.json`
+    );
+    const data = await readFile(commentsPath, "utf-8");
+    const commentsData = JSON.parse(data);
+    return commentsData.comments || [];
+  } catch (error) {
+    return [];
+  }
+}
+
 export default async function TrackPage({
   params,
 }: {
   params: { slug: string };
 }) {
   const metadata = await getTrackMetadata(params.slug);
+  const comments = await getTrackComments(params.slug);
 
   if (!metadata) {
     notFound();
@@ -77,9 +102,13 @@ export default async function TrackPage({
         </p>
       </div>
 
-      {/* Audio Player */}
+      {/* Audio Player with Comments Integration */}
       <div className="mb-12">
-        <AudioPlayer audioUrl={audioUrl} title={metadata.title} />
+        <AudioPlayer
+          audioUrl={audioUrl}
+          title={metadata.title}
+          comments={comments}
+        />
       </div>
 
       {/* Actions - Jordan Singer inspired layout */}
@@ -151,7 +180,7 @@ export default async function TrackPage({
         </div>
       </div>
 
-      {/* Comments Section */}
+      {/* Comments Section with Timestamp Support */}
       <CommentsSection trackSlug={metadata.slug} />
     </div>
   );

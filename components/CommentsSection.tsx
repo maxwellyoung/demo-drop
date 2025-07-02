@@ -5,8 +5,9 @@ import { useState, useEffect } from "react";
 interface Comment {
   id: string;
   author: string;
-  content: string;
-  timestamp: string;
+  message: string;
+  timestamp: number;
+  audioTimestamp?: number;
 }
 
 interface CommentsSectionProps {
@@ -15,9 +16,10 @@ interface CommentsSectionProps {
 
 export default function CommentsSection({ trackSlug }: CommentsSectionProps) {
   const [comments, setComments] = useState<Comment[]>([]);
-  const [newComment, setNewComment] = useState("");
-  const [authorName, setAuthorName] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [author, setAuthor] = useState("");
+  const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [pendingTimestamp, setPendingTimestamp] = useState<number | null>(null);
 
   useEffect(() => {
     fetchComments();
@@ -26,63 +28,97 @@ export default function CommentsSection({ trackSlug }: CommentsSectionProps) {
   const fetchComments = async () => {
     try {
       const response = await fetch(`/api/comments/${trackSlug}`);
-      if (response.ok) {
-        const data = await response.json();
-        setComments(data.comments || []);
-      }
+      const data = await response.json();
+      setComments(data.comments || []);
     } catch (error) {
-      console.error("Failed to fetch comments:", error);
+      console.error("Error fetching comments:", error);
     }
   };
 
-  const submitComment = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || !authorName.trim() || isSubmitting) return;
 
-    setIsSubmitting(true);
+    if (!author.trim() || !message.trim()) return;
+
+    setIsLoading(true);
 
     try {
       const response = await fetch(`/api/comments/${trackSlug}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          author: authorName.trim(),
-          content: newComment.trim(),
+          author: author.trim(),
+          message: message.trim(),
+          audioTimestamp: pendingTimestamp,
         }),
       });
 
       if (response.ok) {
-        const data = await response.json();
-        setComments(data.comments);
-        setNewComment("");
-        // Keep author name for convenience
+        const newComment = await response.json();
+        setComments((prev) =>
+          [...prev, newComment].sort((a, b) => {
+            if (
+              a.audioTimestamp !== undefined &&
+              b.audioTimestamp !== undefined
+            ) {
+              return a.audioTimestamp - b.audioTimestamp;
+            }
+            if (a.audioTimestamp !== undefined) return -1;
+            if (b.audioTimestamp !== undefined) return 1;
+            return a.timestamp - b.timestamp;
+          })
+        );
+        setMessage("");
+        setPendingTimestamp(null);
+
+        // Refresh the page to update comment markers
+        window.location.reload();
       }
     } catch (error) {
-      console.error("Failed to submit comment:", error);
+      console.error("Error posting comment:", error);
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffMins < 1) return "just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
-    });
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
+
+  const formatRelativeTime = (timestamp: number) => {
+    const now = Date.now();
+    const diff = now - timestamp;
+
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    return "just now";
+  };
+
+  const handleSeekToTime = (time: number) => {
+    // Send seek command to audio player via global function
+    if (typeof window !== "undefined" && (window as any).seekToAudioTime) {
+      (window as any).seekToAudioTime(time);
+    }
+  };
+
+  // Listen for timestamp setting from audio player
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as any).setCommentTimestamp = (time: number) => {
+        setPendingTimestamp(time);
+      };
+    }
+  }, []);
 
   return (
     <div className="track-info p-8">
@@ -94,35 +130,55 @@ export default function CommentsSection({ trackSlug }: CommentsSectionProps) {
       </h3>
 
       {/* Comment Form */}
-      <form onSubmit={submitComment} className="mb-8">
+      <form onSubmit={handleSubmit} className="mb-8">
+        {pendingTimestamp !== null && (
+          <div className="mb-4 p-3 bg-blue-900/20 border border-blue-800/50 rounded-lg">
+            <div className="flex items-center justify-between">
+              <span className="text-blue-400 text-sm">
+                💬 Commenting at {formatTime(pendingTimestamp)}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPendingTimestamp(null)}
+                className="text-blue-400 hover:text-blue-300 text-sm"
+              >
+                Remove timestamp
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col gap-4">
           <div className="flex gap-3">
             <input
               type="text"
               placeholder="Your name"
-              value={authorName}
-              onChange={(e) => setAuthorName(e.target.value)}
               className="flex-1 px-4 py-3 bg-neutral-900/50 border border-neutral-700/50 rounded-xl text-sm placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600 transition-colors"
               maxLength={50}
+              value={author}
+              onChange={(e) => setAuthor(e.target.value)}
             />
           </div>
+
           <div className="flex gap-3">
             <textarea
-              placeholder="Add a comment..."
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
+              placeholder={
+                pendingTimestamp !== null
+                  ? `Add a comment at ${formatTime(pendingTimestamp)}...`
+                  : "Add a comment..."
+              }
               className="flex-1 px-4 py-3 bg-neutral-900/50 border border-neutral-700/50 rounded-xl text-sm placeholder:text-neutral-500 focus:outline-none focus:border-neutral-600 transition-colors resize-none"
               rows={3}
               maxLength={500}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
             />
             <button
               type="submit"
-              disabled={
-                !newComment.trim() || !authorName.trim() || isSubmitting
-              }
+              disabled={!author.trim() || !message.trim() || isLoading}
               className="btn-primary self-end disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? "Posting..." : "Post"}
+              {isLoading ? "Posting..." : "Post"}
             </button>
           </div>
         </div>
@@ -141,21 +197,27 @@ export default function CommentsSection({ trackSlug }: CommentsSectionProps) {
           comments.map((comment) => (
             <div
               key={comment.id}
-              className="bg-neutral-900/30 rounded-xl p-4 border border-neutral-800/30"
+              className="bg-neutral-900/30 border border-neutral-800/50 rounded-xl p-4 hover:bg-neutral-900/50 transition-colors"
             >
-              <div className="flex items-center justify-between mb-2">
-                <span
-                  className="font-medium text-sm"
-                  style={{ fontVariationSettings: "'wght' 500" }}
-                >
-                  {comment.author}
-                </span>
-                <span className="text-xs text-neutral-500">
-                  {formatTimestamp(comment.timestamp)}
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <span className="font-medium text-sm">{comment.author}</span>
+                  {comment.audioTimestamp !== undefined && (
+                    <button
+                      onClick={() => handleSeekToTime(comment.audioTimestamp!)}
+                      className="px-2 py-1 bg-blue-900/30 border border-blue-800/50 rounded-md text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-900/50 transition-all duration-200 flex items-center gap-1"
+                      title="Jump to this moment"
+                    >
+                      🎵 {formatTime(comment.audioTimestamp)}
+                    </button>
+                  )}
+                </div>
+                <span className="text-neutral-500 text-xs">
+                  {formatRelativeTime(comment.timestamp)}
                 </span>
               </div>
-              <p className="text-sm text-neutral-200 leading-relaxed">
-                {comment.content}
+              <p className="text-sm text-neutral-300 leading-relaxed">
+                {comment.message}
               </p>
             </div>
           ))
