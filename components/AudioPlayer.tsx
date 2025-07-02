@@ -24,6 +24,7 @@ export default function AudioPlayer({
   const [volume, setVolume] = useState(1);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [showSpeedDropdown, setShowSpeedDropdown] = useState(false);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
 
   const speedOptions = [
     { value: 0.5, label: "0.5x" },
@@ -250,6 +251,127 @@ export default function AudioPlayer({
     }
   }, [hasWaveform, playbackSpeed]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts if user is typing in an input/textarea
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement ||
+        (e.target as HTMLElement)?.contentEditable === "true"
+      ) {
+        return;
+      }
+
+      switch (e.code) {
+        case "Space":
+          e.preventDefault();
+          togglePlayPause();
+          break;
+
+        case "ArrowLeft":
+          e.preventDefault();
+          seekRelative(-10); // Seek back 10 seconds
+          break;
+
+        case "ArrowRight":
+          e.preventDefault();
+          seekRelative(10); // Seek forward 10 seconds
+          break;
+
+        case "ArrowUp":
+          e.preventDefault();
+          adjustVolume(0.1); // Increase volume
+          break;
+
+        case "ArrowDown":
+          e.preventDefault();
+          adjustVolume(-0.1); // Decrease volume
+          break;
+
+        case "Digit1":
+          e.preventDefault();
+          changePlaybackSpeed(0.5);
+          break;
+
+        case "Digit2":
+          e.preventDefault();
+          changePlaybackSpeed(0.75);
+          break;
+
+        case "Digit3":
+          e.preventDefault();
+          changePlaybackSpeed(1);
+          break;
+
+        case "Digit4":
+          e.preventDefault();
+          changePlaybackSpeed(1.25);
+          break;
+
+        case "Digit5":
+          e.preventDefault();
+          changePlaybackSpeed(1.5);
+          break;
+
+        case "Digit6":
+          e.preventDefault();
+          changePlaybackSpeed(2);
+          break;
+
+        case "KeyR":
+          e.preventDefault();
+          restart();
+          break;
+
+        case "KeyM":
+          e.preventDefault();
+          toggleMute();
+          break;
+
+        case "Slash":
+          if (e.shiftKey) {
+            // Shift + / = ?
+            e.preventDefault();
+            setShowKeyboardHelp(!showKeyboardHelp);
+          }
+          break;
+
+        case "Escape":
+          e.preventDefault();
+          setShowKeyboardHelp(false);
+          setShowSpeedDropdown(false);
+          break;
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [hasWaveform, duration, volume, isPlaying]);
+
+  // Helper functions for keyboard shortcuts
+  const seekRelative = (seconds: number) => {
+    if (hasWaveform && wavesurfer.current && duration) {
+      const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
+      wavesurfer.current.seekTo(newTime / duration);
+    } else if (audioRef.current && duration) {
+      const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
+      audioRef.current.currentTime = newTime;
+    }
+  };
+
+  const adjustVolume = (delta: number) => {
+    const newVolume = Math.max(0, Math.min(1, volume + delta));
+    setVolume(newVolume);
+
+    if (hasWaveform && wavesurfer.current) {
+      wavesurfer.current.setVolume(newVolume);
+    } else if (audioRef.current) {
+      audioRef.current.volume = newVolume;
+    }
+  };
+
   const togglePlayPause = () => {
     if (hasWaveform && wavesurfer.current) {
       wavesurfer.current.playPause();
@@ -395,12 +517,21 @@ export default function AudioPlayer({
           )}
         </div>
 
-        {/* Timestamp Comment Hint */}
-        <p className="text-xs text-neutral-500 text-center mt-2">
-          {hasWaveform
-            ? "Click on waveform to add timestamp comment"
-            : "Shift+Click on progress bar to add timestamp comment"}
-        </p>
+        {/* Hints */}
+        <div className="text-xs text-neutral-500 text-center mt-2 space-y-1">
+          <p>
+            {hasWaveform
+              ? "Click on waveform to add timestamp comment"
+              : "Shift+Click on progress bar to add timestamp comment"}
+          </p>
+          <p className="text-neutral-600">
+            Press{" "}
+            <kbd className="px-1 py-0.5 bg-neutral-800 rounded text-[10px]">
+              ?
+            </kbd>{" "}
+            for keyboard shortcuts
+          </p>
+        </div>
       </div>
 
       {/* Controls */}
@@ -549,6 +680,140 @@ export default function AudioPlayer({
           </div>
         </div>
       </div>
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-neutral-900 border border-neutral-700 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-neutral-200">
+                Keyboard Shortcuts
+              </h3>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="p-1 hover:bg-neutral-800 rounded-lg transition-colors"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="text-neutral-400"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-400">Play/Pause</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
+                      Space
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-400">Seek Back</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
+                      ←
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-400">Seek Forward</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
+                      →
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-400">Volume Up</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
+                      ↑
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-400">Volume Down</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
+                      ↓
+                    </kbd>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-400">Restart</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
+                      R
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-400">Mute/Unmute</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
+                      M
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-400">0.5x Speed</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
+                      1
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-400">0.75x Speed</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
+                      2
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-400">1x Speed</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
+                      3
+                    </kbd>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-neutral-700 pt-3 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-400">1.25x Speed</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
+                      4
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-400">1.5x Speed</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
+                      5
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-400">2x Speed</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
+                      6
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-400">Toggle Help</span>
+                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
+                      ?
+                    </kbd>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-xs text-neutral-500 text-center mt-4 pt-3 border-t border-neutral-700">
+                Shortcuts work when not typing in text fields • Press Esc to
+                close
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
