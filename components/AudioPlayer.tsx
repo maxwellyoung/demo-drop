@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import WaveSurfer from "wavesurfer.js";
 
 interface AudioPlayerProps {
   audioUrl: string;
@@ -9,59 +8,120 @@ interface AudioPlayerProps {
 }
 
 export default function AudioPlayer({ audioUrl, title }: AudioPlayerProps) {
+  const audioRef = useRef<HTMLAudioElement>(null);
   const waveformRef = useRef<HTMLDivElement>(null);
-  const wavesurfer = useRef<WaveSurfer | null>(null);
+  const wavesurfer = useRef<any>(null);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasWaveform, setHasWaveform] = useState(false);
 
+  // Initialize HTML5 audio first (always works)
   useEffect(() => {
-    if (!waveformRef.current) return;
+    if (!audioRef.current) return;
 
-    // Initialize WaveSurfer with refined aesthetics
-    wavesurfer.current = WaveSurfer.create({
-      container: waveformRef.current,
-      waveColor: "#525252", // neutral-600
-      progressColor: "#f5f5f5", // neutral-100
-      cursorColor: "#f5f5f5",
-      barWidth: 2,
-      barRadius: 2,
-      barGap: 1,
-      responsive: true,
-      height: 120,
-      normalize: true,
-      backend: "WebAudio",
-    });
+    const audio = audioRef.current;
 
-    // Load audio
-    wavesurfer.current.load(audioUrl);
-
-    // Event listeners
-    wavesurfer.current.on("ready", () => {
-      setDuration(wavesurfer.current?.getDuration() || 0);
+    const handleLoadedMetadata = () => {
+      setDuration(audio.duration);
       setIsLoading(false);
-    });
+    };
 
-    wavesurfer.current.on("play", () => setIsPlaying(true));
-    wavesurfer.current.on("pause", () => setIsPlaying(false));
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+    };
 
-    wavesurfer.current.on("audioprocess", () => {
-      setCurrentTime(wavesurfer.current?.getCurrentTime() || 0);
-    });
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+    const handleEnded = () => setIsPlaying(false);
+
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("ended", handleEnded);
 
     return () => {
-      wavesurfer.current?.destroy();
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("ended", handleEnded);
     };
   }, [audioUrl]);
 
+  // Try to enhance with WaveSurfer (optional)
+  useEffect(() => {
+    let isMounted = true;
+
+    const tryWaveSurfer = async () => {
+      try {
+        // Only try WaveSurfer after HTML5 audio is loaded
+        if (isLoading) return;
+
+        const WaveSurfer = (await import("wavesurfer.js")).default;
+
+        if (!waveformRef.current || !isMounted) return;
+
+        wavesurfer.current = WaveSurfer.create({
+          container: waveformRef.current,
+          waveColor: "#525252",
+          progressColor: "#f5f5f5",
+          cursorColor: "#f5f5f5",
+          barWidth: 2,
+          barRadius: 2,
+          barGap: 1,
+          height: 80,
+          normalize: true,
+        });
+
+        wavesurfer.current.load(audioUrl);
+
+        wavesurfer.current.on("ready", () => {
+          if (isMounted) {
+            setHasWaveform(true);
+          }
+        });
+
+        wavesurfer.current.on("error", (error: any) => {
+          console.warn("WaveSurfer failed, using HTML5 player:", error);
+        });
+      } catch (error) {
+        console.warn("WaveSurfer not available, using HTML5 player:", error);
+      }
+    };
+
+    // Try WaveSurfer after a short delay to ensure HTML5 audio loads first
+    const timeout = setTimeout(tryWaveSurfer, 1000);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeout);
+      if (wavesurfer.current) {
+        wavesurfer.current.destroy();
+      }
+    };
+  }, [audioUrl, isLoading]);
+
   const togglePlayPause = () => {
-    if (wavesurfer.current) {
-      wavesurfer.current.playPause();
+    if (!audioRef.current) return;
+
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
     }
   };
 
+  const seek = (percentage: number) => {
+    if (!audioRef.current) return;
+    audioRef.current.currentTime = (percentage / 100) * duration;
+  };
+
   const formatTime = (seconds: number) => {
+    if (!seconds || isNaN(seconds)) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
@@ -71,7 +131,7 @@ export default function AudioPlayer({ audioUrl, title }: AudioPlayerProps) {
     return (
       <div className="audio-player p-8">
         <div className="animate-pulse">
-          <div className="h-32 bg-neutral-800/50 rounded-xl mb-6"></div>
+          <div className="h-20 bg-neutral-800/50 rounded-xl mb-6"></div>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-neutral-800/50 rounded-full"></div>
@@ -86,14 +146,48 @@ export default function AudioPlayer({ audioUrl, title }: AudioPlayerProps) {
     );
   }
 
+  const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
+
   return (
     <div className="audio-player p-8">
-      {/* Waveform - Rauno Freiberg inspired clean visualization */}
+      {/* Hidden HTML5 audio element */}
+      <audio
+        ref={audioRef}
+        src={audioUrl}
+        preload="metadata"
+        className="hidden"
+      />
+
+      {/* Waveform or Progress Bar */}
       <div className="mb-8">
-        <div ref={waveformRef} className="rounded-lg overflow-hidden"></div>
+        {hasWaveform ? (
+          <div ref={waveformRef} className="rounded-lg overflow-hidden"></div>
+        ) : (
+          <div className="bg-neutral-800/30 rounded-xl p-6">
+            <div className="text-center mb-4">
+              <div className="text-4xl mb-2">🎵</div>
+              <p className="text-sm text-neutral-400">Audio Player</p>
+            </div>
+
+            {/* Custom Progress Bar */}
+            <div
+              className="w-full bg-neutral-700/50 rounded-full h-2 cursor-pointer group"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const percentage = ((e.clientX - rect.left) / rect.width) * 100;
+                seek(percentage);
+              }}
+            >
+              <div
+                className="bg-neutral-300 h-2 rounded-full transition-all duration-100 group-hover:bg-neutral-200"
+                style={{ width: `${progressPercentage}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Controls - Jony Ive inspired minimal interface */}
+      {/* Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-6">
           <button onClick={togglePlayPause} className="play-button group">
@@ -116,7 +210,7 @@ export default function AudioPlayer({ audioUrl, title }: AudioPlayerProps) {
                 fill="currentColor"
                 className="ml-0.5 transition-transform group-hover:scale-110"
               >
-                <polygon points="5,3 19,12 5,21" rx="2" />
+                <polygon points="5,3 19,12 5,21" />
               </svg>
             )}
           </button>
@@ -134,12 +228,13 @@ export default function AudioPlayer({ audioUrl, title }: AudioPlayerProps) {
           </div>
         </div>
 
-        {/* Emil Kowalski inspired secondary controls */}
+        {/* Secondary controls */}
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
-              const currentVolume = wavesurfer.current?.getVolume() || 1;
-              wavesurfer.current?.setVolume(currentVolume > 0 ? 0 : 1);
+              if (audioRef.current) {
+                audioRef.current.volume = audioRef.current.volume > 0 ? 0 : 1;
+              }
             }}
             className="p-3 hover:bg-neutral-800/50 rounded-xl transition-all duration-200 hover:scale-105 group"
             title="Toggle Volume"
@@ -157,7 +252,11 @@ export default function AudioPlayer({ audioUrl, title }: AudioPlayerProps) {
           </button>
 
           <button
-            onClick={() => wavesurfer.current?.seekTo(0)}
+            onClick={() => {
+              if (audioRef.current) {
+                audioRef.current.currentTime = 0;
+              }
+            }}
             className="p-3 hover:bg-neutral-800/50 rounded-xl transition-all duration-200 hover:scale-105 group"
             title="Restart"
           >

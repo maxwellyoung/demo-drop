@@ -4,6 +4,7 @@ import path from "path";
 import AudioPlayer from "@/components/AudioPlayer";
 import ShareButton from "@/components/ShareButton";
 import ReactionsPanel from "@/components/ReactionsPanel";
+import CommentsSection from "@/components/CommentsSection";
 
 interface TrackMetadata {
   slug: string;
@@ -88,7 +89,7 @@ export default async function TrackPage({
       </div>
 
       {/* Track Info - Michael Bierut inspired information design */}
-      <div className="track-info p-8">
+      <div className="track-info p-8 mb-8">
         <h3
           className="text-lg font-medium mb-6 tracking-tight"
           style={{ fontVariationSettings: "'wght' 500" }}
@@ -149,6 +150,9 @@ export default async function TrackPage({
           </div>
         </div>
       </div>
+
+      {/* Comments Section */}
+      <CommentsSection trackSlug={metadata.slug} />
     </div>
   );
 }
