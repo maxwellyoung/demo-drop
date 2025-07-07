@@ -148,11 +148,11 @@ export function ClientTracksPage({ tracks }: ClientTracksPageProps) {
           return a.artist.localeCompare(b.artist);
         case "reactions":
           const aReactions = Object.values(a.reactions || {}).reduce(
-            (sum: number, count: any) => sum + count,
+            (sum: number, count: unknown) => sum + (count as number),
             0
           );
           const bReactions = Object.values(b.reactions || {}).reduce(
-            (sum: number, count: any) => sum + count,
+            (sum: number, count: unknown) => sum + (count as number),
             0
           );
           return bReactions - aReactions;
@@ -244,7 +244,7 @@ export function ClientTracksPage({ tracks }: ClientTracksPageProps) {
       totalReactions: tracks.reduce((sum: number, track: RecordModel) => {
         const reactions = track.reactions || {};
         const reactionCount = Object.values(reactions).reduce(
-          (a: number, b: number) => a + b,
+          (a: number, b: unknown) => a + (b as number),
           0
         );
         return sum + (reactionCount || 0);

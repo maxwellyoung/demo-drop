@@ -1,0 +1,14 @@
+---
+alwaysApply: true
+description: "High-level overview of the project structure."
+---
+# Project Structure
+
+This is a monorepo containing a web application, a mobile application, and a backend.
+
+- **`/app`**: The main web application, built with [Next.js](https://nextjs.org/). The entry point is `[app/layout.tsx](mdc:app/layout.tsx)` and `[app/page.tsx](mdc:app/page.tsx)`.
+- **`/native`**: A React Native mobile application. The entry point is `[native/App.tsx](mdc:native/App.tsx)`.
+- **`/pocketbase`**: The backend service, using [PocketBase](https://pocketbase.io/). It includes data migrations and the executable.
+- **`/components`**: Shared React components used by the Next.js web application.
+- **`/lib`**: Contains shared libraries and client-side code for interacting with services like PocketBase (`[lib/pocketbase.ts](mdc:lib/pocketbase.ts)`) and Cloudflare R2 (`[lib/r2-client.ts](mdc:lib/r2-client.ts)`).
+- **`/packages/shared`**: A shared package, indicating a potential monorepo setup. It contains shared PocketBase types in `[packages/shared/src/pocketbase.ts](mdc:packages/shared/src/pocketbase.ts)`.

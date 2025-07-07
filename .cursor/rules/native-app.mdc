@@ -1,0 +1,14 @@
+---
+description: "Information about the React Native mobile application."
+globs: "native/**"
+---
+# Mobile: React Native
+
+The project includes a React Native application for iOS and Android.
+
+- **Directory**: The mobile app's code is located in `[native/](mdc:native/)`.
+- **Entry Point**: The main component for the app is `[native/App.tsx](mdc:native/App.tsx)`.
+- **Dependencies**: The mobile app manages its own dependencies via `[native/package.json](mdc:native/package.json)`.
+- **Native Projects**:
+    - Android: `[native/android/](mdc:native/android/)`
+    - iOS: `[native/ios/](mdc:native/ios/)`

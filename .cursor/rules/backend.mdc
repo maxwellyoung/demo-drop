@@ -1,0 +1,17 @@
+---
+description: "Information about the backend stack, including PocketBase and Cloudflare R2."
+globs: "app/api/**,lib/{pocketbase,r2-client,sync-manager,storage-manager}.ts,pocketbase/**"
+---
+# Backend: PocketBase & Cloudflare R2
+
+The backend is powered by [PocketBase](https://pocketbase.io/), a self-contained Go backend.
+
+- **Directory**: `[pocketbase/](mdc:pocketbase/)`
+- **Data Migrations**: Schema changes are in `[pocketbase/pb_migrations/](mdc:pocketbase/pb_migrations/)`.
+- **Client**: A PocketBase client is initialized in `[lib/pocketbase.ts](mdc:lib/pocketbase.ts)`.
+
+For file storage, the application uses Cloudflare R2.
+
+- **R2 Client**: The client for interacting with R2 is in `[lib/r2-client.ts](mdc:lib/r2-client.ts)`.
+- **Uploads**: File uploads are handled by the API route at `[app/api/upload/route.ts](mdc:app/api/upload/route.ts)`.
+- **Setup**: The guide for setting up R2 is in `[CLOUDFLARE_R2_SETUP.md](mdc:CLOUDFLARE_R2_SETUP.md)`.

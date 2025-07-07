@@ -1,0 +1,13 @@
+---
+description: "How to setup the project for local development"
+globs: "LOCAL_SETUP.md,package.json,pocketbase/pocketbase-exec"
+---
+# Local Development Setup
+
+To get started with local development, refer to the detailed guide in `[LOCAL_SETUP.md](mdc:LOCAL_SETUP.md)`.
+
+The general steps are:
+1.  Install web dependencies with `npm install`.
+2.  Install mobile dependencies by running `npm install` inside the `[native/](mdc:native/)` directory.
+3.  Start the PocketBase backend.
+4.  Start the Next.js development server.

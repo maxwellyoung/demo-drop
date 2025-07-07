@@ -1,0 +1,13 @@
+---
+description: "Information about the frontend architecture, using Next.js and Tailwind CSS."
+globs: "app/**,components/**,public/**,tailwind.config.js"
+---
+# Frontend: Next.js & Tailwind CSS
+
+The web application is built with [Next.js](https://nextjs.org/) and uses the App Router paradigm.
+
+- **Main Layout**: The root layout is defined in `[app/layout.tsx](mdc:app/layout.tsx)`.
+- **Pages**: Pages are created as `page.tsx` files within the `[app/](mdc:app/)` directory. For example, the tracks page is `[app/tracks/page.tsx](mdc:app/tracks/page.tsx)`.
+- **Components**: Reusable React components are located in the `[components/](mdc:components/)` directory.
+- **Styling**: The project uses [Tailwind CSS](https://tailwindcss.com/). The configuration can be found in `[tailwind.config.js](mdc:tailwind.config.js)`. Global styles are in `[app/globals.css](mdc:app/globals.css)`.
+- **Animations**: Animations are handled using [Framer Motion](https://www.framer.com/motion/). See `[FRAMER_MOTION_GUIDE.md](mdc:FRAMER_MOTION_GUIDE.md)` for more details.
