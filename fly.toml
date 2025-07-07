@@ -1,0 +1,23 @@
+# fly.toml file generated for verse-api on 2024-08-07T22:00:00.000Z
+
+app = "verse-api"
+primary_region = "sjc" # San Jose, CA. Change if you want.
+
+[build]
+
+[http_service]
+  internal_port = 8090
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
+
+[mounts]
+  source="pb_data"
+  destination="/pb_data" 

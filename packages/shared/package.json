@@ -2,5 +2,8 @@
   "name": "@demodrop/shared",
   "version": "1.0.0",
   "main": "src/index.ts",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "pocketbase": "^0.26.1"
+  }
 }

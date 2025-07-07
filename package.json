@@ -29,7 +29,7 @@
     "react-window-infinite-loader": "^1.0.10",
     "slugify": "^1.6.6",
     "sqlite3": "^5.1.6",
-    "react-hotkeys-hook": "^4.7.0",
+    "react-hotkeys-hook": "5.1.0",
     "uuid": "^9.0.1",
     "wavesurfer.js": "^7.5.0"
   },
