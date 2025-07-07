@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createContext, useContext } from "react";
+import { motion, PanInfo } from "framer-motion";
 
 interface Track {
   slug: string;
   title: string;
-  artist: string;
+  artist?: string;
   audioUrl: string;
   genre?: string;
 }
@@ -19,6 +20,7 @@ interface PlayerState {
   volume: number;
   queue: Track[];
   queueIndex: number;
+  isExpanded: boolean;
 }
 
 interface PlayerContextType {
@@ -31,6 +33,8 @@ interface PlayerContextType {
   setVolume: (volume: number) => void;
   addToQueue: (track: Track) => void;
   clearQueue: () => void;
+  removeFromQueue: (index: number) => void;
+  toggleExpand: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -48,13 +52,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     volume: 1,
     queue: [],
     queueIndex: -1,
+    isExpanded: false,
   });
 
   const [hasWaveform, setHasWaveform] = useState(false);
 
   // Initialize WaveSurfer
   useEffect(() => {
-    if (!playerState.currentTrack || !waveformRef.current) return;
+    if (
+      !playerState.isExpanded ||
+      !playerState.currentTrack ||
+      !waveformRef.current
+    ) {
+      return;
+    }
 
     const initWaveSurfer = async () => {
       try {
@@ -101,6 +112,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         wavesurfer.current.on("pause", () => {
           setPlayerState((prev) => ({ ...prev, isPlaying: false }));
         });
+
+        wavesurfer.current.on("finish", () => {
+          // Auto-play next track if available
+          const { queue, queueIndex } = playerState;
+          if (queueIndex < queue.length - 1) {
+            nextTrack();
+          }
+        });
       } catch (error) {
         console.error("Failed to initialize WaveSurfer:", error);
       }
@@ -113,17 +132,30 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         wavesurfer.current.destroy();
       }
     };
-  }, [playerState.currentTrack]);
+  }, [playerState.currentTrack, playerState.isExpanded]);
 
-  const playTrack = useCallback((track: Track) => {
-    setPlayerState((prev) => ({
-      ...prev,
-      currentTrack: track,
-      isPlaying: false,
-      currentTime: 0,
-      duration: 0,
-    }));
-  }, []);
+  const playTrack = useCallback(
+    (track: Track) => {
+      setPlayerState((prev) => ({
+        ...prev,
+        currentTrack: track,
+        isPlaying: true,
+        currentTime: 0,
+        duration: 0,
+      }));
+
+      setTimeout(() => {
+        if (hasWaveform && wavesurfer.current) {
+          wavesurfer.current.play();
+        } else if (audioRef.current) {
+          audioRef.current?.play().catch(() => {
+            /* Browser might block autoplay; user will need to click */
+          });
+        }
+      }, 0);
+    },
+    [hasWaveform]
+  );
 
   const togglePlayPause = useCallback(() => {
     if (hasWaveform && wavesurfer.current) {
@@ -145,7 +177,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         currentTrack: nextTrack,
         queueIndex: queueIndex + 1,
-        isPlaying: false,
+        isPlaying: true,
         currentTime: 0,
       }));
     }
@@ -159,7 +191,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         currentTrack: prevTrack,
         queueIndex: queueIndex - 1,
-        isPlaying: false,
+        isPlaying: true,
         currentTime: 0,
       }));
     }
@@ -195,12 +227,25 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  const removeFromQueue = useCallback((index: number) => {
+    setPlayerState((prev) => ({
+      ...prev,
+      queue: prev.queue.filter((_, i) => i !== index),
+      queueIndex:
+        prev.queueIndex > index ? prev.queueIndex - 1 : prev.queueIndex,
+    }));
+  }, []);
+
   const clearQueue = useCallback(() => {
     setPlayerState((prev) => ({
       ...prev,
       queue: [],
       queueIndex: -1,
     }));
+  }, []);
+
+  const toggleExpand = useCallback(() => {
+    setPlayerState((prev) => ({ ...prev, isExpanded: !prev.isExpanded }));
   }, []);
 
   const contextValue: PlayerContextType = {
@@ -212,7 +257,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     seekTo,
     setVolume,
     addToQueue,
+    removeFromQueue,
     clearQueue,
+    toggleExpand,
   };
 
   return (
@@ -258,113 +305,298 @@ interface MiniPlayerProps {
 }
 
 function PersistentMiniPlayer({ waveformRef, hasWaveform }: MiniPlayerProps) {
-  const player = useContext(PlayerContext);
-  if (!player) return null;
+  const player = usePlayer();
+  const [showVolume, setShowVolume] = useState(false);
+  const progressRef = useRef<HTMLDivElement>(null);
 
-  const { playerState, togglePlayPause, nextTrack, previousTrack } = player;
-  const { currentTrack, isPlaying, currentTime, duration } = playerState;
+  if (!player || !player.playerState.currentTrack) return null;
 
-  if (!currentTrack) return null;
+  const {
+    currentTrack,
+    isPlaying,
+    currentTime,
+    duration,
+    volume,
+    queue,
+    queueIndex,
+    isExpanded,
+  } = player.playerState;
 
+  // Auto-hide volume slider
+  useEffect(() => {
+    if (showVolume) {
+      const timer = setTimeout(() => setShowVolume(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showVolume]);
+
+  const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
   const formatTime = (seconds: number) => {
+    if (!seconds || isNaN(seconds)) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!progressRef.current) return;
+    const rect = progressRef.current.getBoundingClientRect();
+    const percentage = (e.clientX - rect.left) / rect.width;
+    const newTime = percentage * duration;
+    player.seekTo(newTime);
+  };
+
+  const handleDragEnd = (
+    event: MouseEvent | TouchEvent | PointerEvent,
+    info: PanInfo
+  ) => {
+    const swipeThreshold = 50;
+    if (info.offset.y < -swipeThreshold) {
+      // Swiped up
+      if (!isExpanded) {
+        player.toggleExpand();
+      }
+    } else if (info.offset.y > swipeThreshold) {
+      // Swiped down
+      if (isExpanded) {
+        player.toggleExpand();
+      }
+    }
+  };
 
   return (
-    <div className="mini-player">
-      <div className="mini-player-content">
+    <motion.div
+      className={`mini-player ${isExpanded ? "expanded" : ""}`}
+      drag="y"
+      dragConstraints={{ top: 0, bottom: 0 }}
+      dragElastic={0.1}
+      onDragEnd={handleDragEnd}
+    >
+      {/* Progress Bar */}
+      <div className="mini-progress">
+        <div
+          ref={progressRef}
+          className="progress-track"
+          onClick={handleProgressClick}
+        >
+          <div
+            className="progress-fill"
+            style={{ width: `${progressPercentage}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Main Player */}
+      <div className="mini-player-main">
         {/* Track Info */}
-        <div className="mini-player-info">
-          <div className="mini-player-artwork">
-            <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 opacity-80 rounded-lg">
-              <div className="w-full h-full flex items-center justify-center">
-                <span className="text-white text-lg">🎵</span>
-              </div>
-            </div>
+        <div className="mini-track-info" onClick={() => player.toggleExpand()}>
+          <div className="mini-cover">
+            <div className="cover-gradient" />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+            </svg>
           </div>
-          <div className="mini-player-details">
-            <h4 className="mini-player-title">{currentTrack.title}</h4>
-            <p className="mini-player-artist">{currentTrack.artist}</p>
+
+          <div className="mini-details">
+            <div className="mini-title">{currentTrack.title}</div>
+            {currentTrack.artist && (
+              <div className="mini-artist">{currentTrack.artist}</div>
+            )}
           </div>
         </div>
 
         {/* Controls */}
-        <div className="mini-player-controls">
-          <button
-            onClick={previousTrack}
-            className="mini-control-btn"
-            disabled={playerState.queueIndex <= 0}
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M15.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L11.414 9H17a1 1 0 110 2h-5.586l4.293 4.293a1 1 0 010 1.414zM7 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </button>
+        <div className="mini-controls">
+          {queueIndex > 0 && (
+            <button
+              onClick={player.previousTrack}
+              className="mini-btn"
+              title="Previous Track"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <polygon points="19,20 9,12 19,4" />
+                <line x1="5" y1="19" x2="5" y2="5" />
+              </svg>
+            </button>
+          )}
 
-          <button onClick={togglePlayPause} className="mini-play-button">
-            {isPlaying ? (
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <button
+            onClick={player.togglePlayPause}
+            className="mini-play-btn"
+            title={isPlaying ? "Pause" : "Play"}
+          >
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 20 20">
+              {isPlaying ? (
                 <path
                   fillRule="evenodd"
                   d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z"
                   clipRule="evenodd"
                 />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              ) : (
                 <path
                   fillRule="evenodd"
                   d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
                   clipRule="evenodd"
                 />
-              </svg>
-            )}
-          </button>
-
-          <button
-            onClick={nextTrack}
-            className="mini-control-btn"
-            disabled={playerState.queueIndex >= playerState.queue.length - 1}
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M4.293 4.293a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L8.586 11H3a1 1 0 110-2h5.586L4.293 5.707a1 1 0 010-1.414zM13 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1z"
-                clipRule="evenodd"
-              />
+              )}
             </svg>
           </button>
-        </div>
 
-        {/* Waveform */}
-        <div className="mini-player-waveform">
-          {hasWaveform ? (
-            <div ref={waveformRef} className="w-full h-full" />
-          ) : (
-            <div className="mini-progress-bar">
-              <div
-                className="mini-progress-fill"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
+          {queueIndex < queue.length - 1 && (
+            <button
+              onClick={player.nextTrack}
+              className="mini-btn"
+              title="Next Track"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <polygon points="5,4 15,12 5,20" />
+                <line x1="19" y1="5" x2="19" y2="19" />
+              </svg>
+            </button>
           )}
         </div>
 
         {/* Time Display */}
-        <div className="mini-player-time">
-          <span className="text-xs text-neutral-400">
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </span>
+        <div className="mini-time">
+          <span>{formatTime(currentTime)}</span>
+          <span className="time-separator">/</span>
+          <span>{formatTime(duration)}</span>
+        </div>
+
+        {/* Volume Control */}
+        <div className="mini-volume">
+          <button
+            onClick={() => setShowVolume(!showVolume)}
+            className="mini-btn"
+            title="Volume"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              {volume > 0 ? (
+                <>
+                  <polygon points="11,5 6,9 2,9 2,15 6,15 11,19 11,5" />
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+                </>
+              ) : (
+                <>
+                  <polygon points="11,5 6,9 2,9 2,15 6,15 11,19 11,5" />
+                  <line x1="23" y1="9" x2="17" y2="15" />
+                  <line x1="17" y1="9" x2="23" y2="15" />
+                </>
+              )}
+            </svg>
+          </button>
+
+          {showVolume && (
+            <div className="volume-popup">
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={volume}
+                onChange={(e) => player.setVolume(parseFloat(e.target.value))}
+                className="volume-slider"
+                title="Volume"
+              />
+            </div>
+          )}
         </div>
       </div>
-    </div>
+
+      {/* Expanded View */}
+      {isExpanded && (
+        <div className="mini-expanded">
+          <div className="expanded-waveform">
+            {hasWaveform ? (
+              <div ref={waveformRef} className="mini-waveform" />
+            ) : (
+              <div className="waveform-placeholder">
+                <div className="waveform-bars">
+                  <div className="waveform-bar" style={{ height: "40%" }} />
+                  <div className="waveform-bar" style={{ height: "70%" }} />
+                  <div className="waveform-bar" style={{ height: "50%" }} />
+                  <div className="waveform-bar" style={{ height: "30%" }} />
+                  <div className="waveform-bar" style={{ height: "60%" }} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="expanded-controls">
+            <button className="expanded-btn" title="Loop">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M17 2a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4h10z" />
+                <path d="M7 8l3 3-3 3" />
+                <path d="M17 8l-3 3 3 3" />
+              </svg>
+            </button>
+
+            <button className="expanded-btn" title="Shuffle">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <polyline points="16,3 21,3 21,8" />
+                <line x1="4" y1="20" x2="21" y2="3" />
+                <polyline points="21,16 21,21 16,21" />
+                <line x1="15" y1="15" x2="21" y2="21" />
+                <line x1="4" y1="4" x2="9" y2="9" />
+              </svg>
+            </button>
+
+            <button className="expanded-btn" title="Queue">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <line x1="8" y1="6" x2="21" y2="6" />
+                <line x1="8" y1="12" x2="21" y2="12" />
+                <line x1="8" y1="18" x2="21" y2="18" />
+                <line x1="3" y1="6" x2="3.01" y2="6" />
+                <line x1="3" y1="12" x2="3.01" y2="12" />
+                <line x1="3" y1="18" x2="3.01" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+    </motion.div>
   );
 }
 

@@ -290,8 +290,8 @@ export default function CommentsSection({
         isReply ? "ml-8 border-l-2 border-l-blue-500/30" : ""
       }`}
     >
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-start justify-between mb-2 gap-2">
+        <div className="flex items-center gap-3 flex-wrap">
           <span className="font-medium text-sm">{comment.author}</span>
           {comment.category && (
             <span
@@ -312,7 +312,7 @@ export default function CommentsSection({
             </button>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-start sm:self-center">
           <span className="text-neutral-500 text-xs">
             {formatRelativeTime(comment.timestamp)}
           </span>
@@ -466,8 +466,8 @@ export default function CommentsSection({
           </div>
         )}
 
-        <div className="flex flex-col gap-4">
-          <div className="flex gap-3">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-3">
             <input
               type="text"
               placeholder="Your name"
@@ -491,7 +491,7 @@ export default function CommentsSection({
             </select>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <textarea
               placeholder={
                 pendingTimestamp !== null
@@ -507,7 +507,7 @@ export default function CommentsSection({
             <button
               type="submit"
               disabled={!author.trim() || !message.trim() || isLoading}
-              className="btn-primary self-end disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary self-stretch sm:self-end disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? "Posting..." : "Post"}
             </button>

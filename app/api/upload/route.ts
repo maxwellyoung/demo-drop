@@ -3,6 +3,7 @@ import { writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
 import slugify from "slugify";
+import { AudioProcessor } from "../../../lib/audio-processor";
 
 // Configure the route to handle large files
 export const runtime = "nodejs";
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now();
     const slug = `${baseSlug}-${timestamp}`;
 
-    // Save file
+    // Save original file
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const filename = `${slug}${extension}`;
@@ -82,16 +83,45 @@ export async function POST(request: NextRequest) {
 
     await writeFile(filepath, buffer);
 
-    // Create metadata file
+    // Process audio file with enhanced pipeline
+    const audioProcessor = new AudioProcessor();
+    let processedData;
+
+    try {
+      processedData = await audioProcessor.processAudioFile(
+        filepath,
+        uploadsDir,
+        slug
+      );
+    } catch (error) {
+      console.error("Audio processing failed:", error);
+      // Continue with basic upload if processing fails
+      processedData = null;
+    }
+
+    // Create enhanced metadata file
     const metadata = {
       slug,
       originalName: file.name,
       filename,
+      streamingFilename: processedData ? `${slug}-streaming.mp3` : filename,
+      thumbnailFilename: processedData ? `${slug}-spectral.png` : null,
+      peaksFilename: processedData ? `${slug}-peaks.json` : null,
       title: nameWithoutExt,
       artist: "Maxwell", // Default artist
       uploadedAt: new Date().toISOString(),
       size: file.size,
       type: file.type,
+      // Enhanced audio metadata
+      audioMetadata: processedData
+        ? {
+            duration: processedData.metadata.duration,
+            bitrate: processedData.metadata.bitrate,
+            sampleRate: processedData.metadata.sampleRate,
+            channels: processedData.metadata.channels,
+            format: processedData.metadata.format,
+          }
+        : null,
       reactions: {
         fire: 0,
         cry: 0,

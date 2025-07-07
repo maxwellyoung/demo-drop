@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { log } from "../lib/logger";
 
 interface Reactions {
   fire: number;
@@ -51,7 +52,7 @@ export default function ReactionsPanel({
         body: JSON.stringify({ type, action: wasActive ? "remove" : "add" }),
       });
     } catch (error) {
-      console.error("Failed to update reaction:", error);
+      log.error("Failed to update reaction", { error });
       // Revert optimistic update on error
       setReactions(initialReactions);
       setUserReaction(null);

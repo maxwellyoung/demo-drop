@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
 
 interface Shortcut {
   key: string;
@@ -55,10 +56,6 @@ export default function KeyboardShortcuts({
 }: KeyboardShortcutsProps) {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [lastAction, setLastAction] = useState<string | null>(null);
-  const [isMac] = useState(
-    typeof window !== "undefined" &&
-      navigator.platform.toUpperCase().indexOf("MAC") >= 0
-  );
 
   // Visual feedback for keyboard shortcuts
   const showActionFeedback = useCallback((action: string) => {
@@ -66,187 +63,236 @@ export default function KeyboardShortcuts({
     setTimeout(() => setLastAction(null), 1500);
   }, []);
 
-  // Handle keyboard events
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      // Don't trigger shortcuts when typing in input fields
-      if (
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement ||
-        event.target instanceof HTMLSelectElement
-      ) {
-        return;
-      }
+  const isMac =
+    typeof window !== "undefined" &&
+    navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+  const modifier = isMac ? "meta" : "ctrl";
 
-      const { key, ctrlKey, metaKey, shiftKey, altKey } = event;
-      const modifier =
-        ctrlKey || metaKey ? (isMac ? "cmd" : "ctrl") : undefined;
-
-      // Prevent default for our shortcuts
-      const preventDefault = () => {
-        event.preventDefault();
-        event.stopPropagation();
-      };
-
-      // Playback shortcuts
-      if (key === " " && !modifier) {
-        preventDefault();
-        onPlayPause?.();
-        showActionFeedback("Play/Pause");
-      } else if (key === "ArrowRight" && !modifier) {
-        preventDefault();
-        onNextTrack?.();
-        showActionFeedback("Next Track");
-      } else if (key === "ArrowLeft" && !modifier) {
-        preventDefault();
-        onPreviousTrack?.();
-        showActionFeedback("Previous Track");
-      } else if (key === "ArrowUp" && !modifier) {
-        preventDefault();
-        onVolumeUp?.();
-        showActionFeedback("Volume Up");
-      } else if (key === "ArrowDown" && !modifier) {
-        preventDefault();
-        onVolumeDown?.();
-        showActionFeedback("Volume Down");
-      } else if (key === "m" && !modifier) {
-        preventDefault();
-        onToggleMute?.();
-        showActionFeedback("Toggle Mute");
-      }
-
-      // Action shortcuts
-      else if (key === "a" && !modifier) {
-        preventDefault();
-        onAddToPlaylist?.();
-        showActionFeedback("Add to Playlist");
-      } else if (key === "s" && !modifier) {
-        preventDefault();
-        onShareTrack?.();
-        showActionFeedback("Share Track");
-      } else if (key === "c" && !modifier) {
-        preventDefault();
-        onCopyLink?.();
-        showActionFeedback("Copy Link");
-      } else if (key === "r" && !modifier) {
-        preventDefault();
-        onAddReaction?.();
-        showActionFeedback("Add Reaction");
-      } else if (key === "e" && !modifier) {
-        preventDefault();
-        onEditMetadata?.();
-        showActionFeedback("Edit Metadata");
-      }
-
-      // Navigation shortcuts
-      else if (key === "/" && !modifier) {
-        preventDefault();
-        onQuickSearch?.();
-        showActionFeedback("Quick Search");
-      } else if (key === "Escape" && !modifier) {
-        preventDefault();
-        onCloseModals?.();
-        showActionFeedback("Close");
-      } else if (key === "p" && modifier) {
-        preventDefault();
-        onTogglePlaylist?.();
-        showActionFeedback("Toggle Playlist");
-      } else if (key === "k" && modifier) {
-        preventDefault();
-        onToggleComments?.();
-        showActionFeedback("Toggle Comments");
-      } else if (key === "f" && modifier) {
-        preventDefault();
-        onToggleFilters?.();
-        showActionFeedback("Toggle Filters");
-      }
-
-      // System shortcuts
-      else if (key === "h" && modifier) {
-        preventDefault();
-        onToggleHelp?.();
-        showActionFeedback("Toggle Help");
-      } else if (key === "i" && modifier) {
-        preventDefault();
-        onToggleMiniPlayer?.();
-        showActionFeedback("Toggle Mini Player");
-      } else if (key === "Enter" && modifier) {
-        preventDefault();
-        onToggleFullscreen?.();
-        showActionFeedback("Toggle Fullscreen");
-      }
-
-      // Power user shortcuts
-      else if (key === "1" && !modifier) {
-        preventDefault();
-        // Jump to tracks page
-        window.location.href = "/tracks";
-        showActionFeedback("Go to Tracks");
-      } else if (key === "2" && !modifier) {
-        preventDefault();
-        // Jump to playlists page
-        window.location.href = "/playlists";
-        showActionFeedback("Go to Playlists");
-      } else if (key === "3" && !modifier) {
-        preventDefault();
-        // Jump to upload page
-        window.location.href = "/";
-        showActionFeedback("Go to Upload");
-      } else if (key === "0" && !modifier) {
-        preventDefault();
-        // Jump to home
-        window.location.href = "/";
-        showActionFeedback("Go to Home");
-      }
+  // Playback
+  useHotkeys(
+    "space",
+    () => {
+      onPlayPause?.();
+      showActionFeedback("Play/Pause");
     },
-    [
-      isMac,
-      onPlayPause,
-      onNextTrack,
-      onPreviousTrack,
-      onVolumeUp,
-      onVolumeDown,
-      onToggleMute,
-      onAddToPlaylist,
-      onShareTrack,
-      onCopyLink,
-      onAddReaction,
-      onEditMetadata,
-      onQuickSearch,
-      onCloseModals,
-      onToggleMiniPlayer,
-      onToggleFullscreen,
-      onTogglePlaylist,
-      onToggleComments,
-      onToggleFilters,
-      onToggleHelp,
-      showActionFeedback,
-    ]
+    { preventDefault: true },
+    [onPlayPause]
+  );
+  useHotkeys(
+    "arrowright",
+    () => {
+      onNextTrack?.();
+      showActionFeedback("Next Track");
+    },
+    { preventDefault: true },
+    [onNextTrack]
+  );
+  useHotkeys(
+    "arrowleft",
+    () => {
+      onPreviousTrack?.();
+      showActionFeedback("Previous Track");
+    },
+    { preventDefault: true },
+    [onPreviousTrack]
+  );
+  useHotkeys(
+    "arrowup",
+    () => {
+      onVolumeUp?.();
+      showActionFeedback("Volume Up");
+    },
+    { preventDefault: true },
+    [onVolumeUp]
+  );
+  useHotkeys(
+    "arrowdown",
+    () => {
+      onVolumeDown?.();
+      showActionFeedback("Volume Down");
+    },
+    { preventDefault: true },
+    [onVolumeDown]
+  );
+  useHotkeys(
+    "m",
+    () => {
+      onToggleMute?.();
+      showActionFeedback("Toggle Mute");
+    },
+    { preventDefault: true },
+    [onToggleMute]
   );
 
-  // Register keyboard event listeners
-  useEffect(() => {
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
+  // Actions
+  useHotkeys(
+    "a",
+    () => {
+      onAddToPlaylist?.();
+      showActionFeedback("Add to Playlist");
+    },
+    { preventDefault: true },
+    [onAddToPlaylist]
+  );
+  useHotkeys(
+    "s",
+    () => {
+      onShareTrack?.();
+      showActionFeedback("Share Track");
+    },
+    { preventDefault: true },
+    [onShareTrack]
+  );
+  useHotkeys(
+    "c",
+    () => {
+      onCopyLink?.();
+      showActionFeedback("Copy Link");
+    },
+    { preventDefault: true },
+    [onCopyLink]
+  );
+  useHotkeys(
+    "r",
+    () => {
+      onAddReaction?.();
+      showActionFeedback("Add Reaction");
+    },
+    { preventDefault: true },
+    [onAddReaction]
+  );
+  useHotkeys(
+    "e",
+    () => {
+      onEditMetadata?.();
+      showActionFeedback("Edit Metadata");
+    },
+    { preventDefault: true },
+    [onEditMetadata]
+  );
+
+  // Navigation
+  useHotkeys(
+    "/",
+    (e: KeyboardEvent) => {
+      e.preventDefault();
+      onQuickSearch?.();
+      showActionFeedback("Quick Search");
+    },
+    [onQuickSearch]
+  );
+  useHotkeys(
+    "escape",
+    () => {
+      onCloseModals?.();
+      showActionFeedback("Close");
+    },
+    [onCloseModals]
+  );
+  useHotkeys(
+    `${modifier}+p`,
+    () => {
+      onTogglePlaylist?.();
+      showActionFeedback("Toggle Playlist");
+    },
+    { preventDefault: true },
+    [onTogglePlaylist]
+  );
+  useHotkeys(
+    `${modifier}+k`,
+    () => {
+      onToggleComments?.();
+      showActionFeedback("Toggle Comments");
+    },
+    { preventDefault: true },
+    [onToggleComments]
+  );
+  useHotkeys(
+    `${modifier}+f`,
+    () => {
+      onToggleFilters?.();
+      showActionFeedback("Toggle Filters");
+    },
+    { preventDefault: true },
+    [onToggleFilters]
+  );
+
+  // System
+  useHotkeys(
+    `${modifier}+h`,
+    (e: KeyboardEvent) => {
+      e.preventDefault();
+      onToggleHelp?.();
+      showActionFeedback("Toggle Help");
+    },
+    [onToggleHelp]
+  );
+  useHotkeys(
+    `${modifier}+i`,
+    () => {
+      onToggleMiniPlayer?.();
+      showActionFeedback("Toggle Mini Player");
+    },
+    { preventDefault: true },
+    [onToggleMiniPlayer]
+  );
+  useHotkeys(
+    `${modifier}+enter`,
+    () => {
+      onToggleFullscreen?.();
+      showActionFeedback("Toggle Fullscreen");
+    },
+    { preventDefault: true },
+    [onToggleFullscreen]
+  );
+
+  // Power user shortcuts
+  useHotkeys(
+    "1",
+    () => {
+      window.location.href = "/tracks";
+      showActionFeedback("Go to Tracks");
+    },
+    { preventDefault: true }
+  );
+  useHotkeys(
+    "2",
+    () => {
+      window.location.href = "/playlists";
+      showActionFeedback("Go to Playlists");
+    },
+    { preventDefault: true }
+  );
+  useHotkeys(
+    "3",
+    () => {
+      window.location.href = "/";
+      showActionFeedback("Go to Upload");
+    },
+    { preventDefault: true }
+  );
+  useHotkeys(
+    "0",
+    () => {
+      window.location.href = "/";
+      showActionFeedback("Go to Home");
+    },
+    { preventDefault: true }
+  );
 
   // Toggle help overlay
   const toggleHelp = useCallback(() => {
     setShowShortcuts(!showShortcuts);
   }, [showShortcuts]);
 
-  // Register help toggle shortcut
-  useEffect(() => {
-    const handleHelpShortcut = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === "h") {
-        event.preventDefault();
-        toggleHelp();
-      }
-    };
-
-    document.addEventListener("keydown", handleHelpShortcut);
-    return () => document.removeEventListener("keydown", handleHelpShortcut);
-  }, [toggleHelp]);
+  useHotkeys(
+    `${modifier}+h`,
+    (e: KeyboardEvent) => {
+      e.preventDefault();
+      toggleHelp();
+    },
+    [toggleHelp]
+  );
 
   const shortcuts: Shortcut[] = [
     // Playback
@@ -432,6 +478,10 @@ export default function KeyboardShortcuts({
     }
   };
 
+  if (!showShortcuts) {
+    return null;
+  }
+
   return (
     <>
       {/* Action Feedback Overlay */}
@@ -451,7 +501,7 @@ export default function KeyboardShortcuts({
       {/* Help Button */}
       <button
         onClick={toggleHelp}
-        className="fixed bottom-24 right-6 z-40 w-12 h-12 bg-neutral-900/80 backdrop-blur-xl border border-neutral-800/50 rounded-2xl text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800/80 transition-all duration-300 ease-out shadow-xl hover:shadow-2xl hover:scale-110"
+        className="keyboard-shortcuts-btn fixed bottom-4 right-4 flex justify-center items-center"
         title="Keyboard Shortcuts (Ctrl+H)"
       >
         <svg

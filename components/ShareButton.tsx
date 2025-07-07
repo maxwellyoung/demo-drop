@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { log } from "../lib/logger";
 
 interface ShareButtonProps {
   url: string;
@@ -30,7 +31,7 @@ export default function ShareButton({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error("Failed to copy:", error);
+      log.error("Failed to copy to clipboard", { error });
     }
   };
 

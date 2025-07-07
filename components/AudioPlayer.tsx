@@ -1,85 +1,179 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { log } from "../lib/logger";
+import {
+  SPEED_OPTIONS,
+  EQ_BANDS,
+  AUDIO_CONSTANTS,
+  WAVEFORM_CONFIG,
+  SPECTRUM_CONFIG,
+} from "../constants/audio";
 
 interface AudioPlayerProps {
   audioUrl: string;
   title: string;
+  artist?: string;
   comments?: Array<{ id: string; audioTimestamp?: number }>;
+  onNextTrack?: () => void;
+  onPreviousTrack?: () => void;
+  onQueueChange?: (queue: any[]) => void;
+}
+
+interface EQBand {
+  frequency: number;
+  gain: number;
+  q: number;
 }
 
 export default function AudioPlayer({
   audioUrl,
   title,
+  artist,
   comments = [],
+  onNextTrack,
+  onPreviousTrack,
+  onQueueChange,
 }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const waveformRef = useRef<HTMLDivElement>(null);
+  const spectrumRef = useRef<HTMLCanvasElement>(null);
   const wavesurfer = useRef<any>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const eqNodesRef = useRef<BiquadFilterNode[]>([]);
 
+  // Basic playback state
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [hasWaveform, setHasWaveform] = useState(false);
-  const [volume, setVolume] = useState(1);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [volume, setVolume] = useState<number>(AUDIO_CONSTANTS.DEFAULT_VOLUME);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(
+    AUDIO_CONSTANTS.DEFAULT_PLAYBACK_SPEED
+  );
   const [showSpeedDropdown, setShowSpeedDropdown] = useState(false);
-  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
 
-  // Loop functionality
+  // Advanced features
   const [isLooping, setIsLooping] = useState(false);
   const [loopStart, setLoopStart] = useState<number | null>(null);
   const [loopEnd, setLoopEnd] = useState<number | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
+  const [showEQ, setShowEQ] = useState(false);
+  const [showSpectrum, setShowSpectrum] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [queue, setQueue] = useState<any[]>([]);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
 
-  const speedOptions = [
-    { value: 0.5, label: "0.5x" },
-    { value: 0.75, label: "0.75x" },
-    { value: 1, label: "1x" },
-    { value: 1.25, label: "1.25x" },
-    { value: 1.5, label: "1.5x" },
-    { value: 2, label: "2x" },
-  ];
+  // EQ settings
+  const [eqBands, setEqBands] = useState<EQBand[]>([...EQ_BANDS]);
 
-  // Reset speed and loop when audio URL changes
+  const speedOptions = SPEED_OPTIONS;
+
+  // Reset settings when audio URL changes
   useEffect(() => {
-    setPlaybackSpeed(1);
+    setPlaybackSpeed(AUDIO_CONSTANTS.DEFAULT_PLAYBACK_SPEED);
     setShowSpeedDropdown(false);
     clearLoop();
+    resetEQ();
   }, [audioUrl]);
 
-  // HTML5 audio setup
+  // Cleanup on component unmount
   useEffect(() => {
-    if (!audioRef.current) return;
+    return () => {
+      // Cleanup WaveSurfer
+      if (wavesurfer.current) {
+        try {
+          wavesurfer.current.destroy();
+        } catch (error) {
+          log.warn("Error destroying WaveSurfer on unmount", { error });
+        }
+        wavesurfer.current = null;
+      }
+
+      // Cleanup audio context
+      if (audioContextRef.current) {
+        try {
+          audioContextRef.current.close();
+        } catch (error) {
+          log.warn("Error closing audio context", { error });
+        }
+        audioContextRef.current = null;
+      }
+    };
+  }, []);
+
+  // Initialize Web Audio API
+  useEffect(() => {
+    if (typeof window !== "undefined" && !audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext ||
+        (window as any).webkitAudioContext)();
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = SPECTRUM_CONFIG.fftSize;
+
+      // Create EQ nodes
+      eqNodesRef.current = eqBands.map((band) => {
+        const filter = audioContextRef.current!.createBiquadFilter();
+        filter.type = "peaking";
+        filter.frequency.value = band.frequency;
+        filter.gain.value = band.gain;
+        filter.Q.value = band.q;
+        return filter;
+      });
+    }
+  }, []);
+
+  // HTML5 audio setup with Web Audio integration
+  useEffect(() => {
+    if (!audioRef.current || !audioContextRef.current) return;
 
     const audio = audioRef.current;
+    const audioContext = audioContextRef.current;
+    const analyser = analyserRef.current!;
 
     const handleLoadedMetadata = () => {
       setDuration(audio.duration || 0);
       audio.playbackRate = playbackSpeed;
+
+      // Connect audio to Web Audio API
+      const source = audioContext.createMediaElementSource(audio);
+
+      // Connect through EQ chain
+      let currentNode: AudioNode = source;
+      eqNodesRef.current.forEach((filter) => {
+        currentNode.connect(filter);
+        currentNode = filter;
+      });
+
+      // Connect to analyser and output
+      currentNode.connect(analyser);
+      analyser.connect(audioContext.destination);
     };
 
     const handleTimeUpdate = () => {
       const time = audio.currentTime;
       setCurrentTime(time);
 
-      // Handle looping - use ref for current state
-      const currentLoopState = loopStateRef.current;
+      // Handle looping
       if (
-        currentLoopState.isLooping &&
-        currentLoopState.loopStart !== null &&
-        currentLoopState.loopEnd !== null &&
-        time >= currentLoopState.loopEnd
+        isLooping &&
+        loopStart !== null &&
+        loopEnd !== null &&
+        time >= loopEnd
       ) {
-        console.log("Loop: jumping to start");
-        audio.currentTime = currentLoopState.loopStart;
+        audio.currentTime = loopStart;
       }
     };
 
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
-    const handleEnded = () => setIsPlaying(false);
+    const handleEnded = () => {
+      setIsPlaying(false);
+      if (queue.length > 0 && currentTrackIndex < queue.length - 1) {
+        playNextTrack();
+      }
+    };
 
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
     audio.addEventListener("timeupdate", handleTimeUpdate);
@@ -94,60 +188,155 @@ export default function AudioPlayer({
       audio.removeEventListener("pause", handlePause);
       audio.removeEventListener("ended", handleEnded);
     };
-  }, [audioUrl]);
+  }, [audioUrl, isLooping, loopStart, loopEnd, queue, currentTrackIndex]);
 
-  // Create seek function for comments
-  const seekToTime = (time: number) => {
-    if (hasWaveform && wavesurfer.current) {
-      wavesurfer.current.seekTo(time / duration);
-    } else if (audioRef.current) {
-      audioRef.current.currentTime = time;
+  // Spectrum analyzer animation
+  useEffect(() => {
+    if (!showSpectrum || !spectrumRef.current || !analyserRef.current) return;
+
+    const canvas = spectrumRef.current;
+    const ctx = canvas.getContext("2d")!;
+    const analyser = analyserRef.current;
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    const drawSpectrum = () => {
+      if (!showSpectrum) return;
+
+      requestAnimationFrame(drawSpectrum);
+      analyser.getByteFrequencyData(dataArray);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const barWidth = (canvas.width / bufferLength) * 2.5;
+      let barHeight;
+      let x = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        barHeight = (dataArray[i] / 255) * canvas.height;
+
+        // Create gradient based on frequency
+        const gradient = ctx.createLinearGradient(
+          0,
+          canvas.height - barHeight,
+          0,
+          canvas.height
+        );
+        const hue = (i / bufferLength) * 360;
+        gradient.addColorStop(0, `hsl(${hue}, 70%, 60%)`);
+        gradient.addColorStop(1, `hsl(${hue}, 70%, 30%)`);
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+
+        x += barWidth + 1;
+      }
+    };
+
+    drawSpectrum();
+  }, [showSpectrum]);
+
+  // Queue management
+  const addToQueue = useCallback(
+    (track: any) => {
+      setQueue((prev) => [...prev, track]);
+      onQueueChange?.([...queue, track]);
+    },
+    [queue, onQueueChange]
+  );
+
+  const removeFromQueue = useCallback((index: number) => {
+    setQueue((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const playNextTrack = useCallback(() => {
+    if (currentTrackIndex < queue.length - 1) {
+      setCurrentTrackIndex((prev) => prev + 1);
+      onNextTrack?.();
     }
-  };
+  }, [currentTrackIndex, queue.length, onNextTrack]);
 
-  // Expose functions globally for keyboard shortcuts and comments
+  const playPreviousTrack = useCallback(() => {
+    if (currentTrackIndex > 0) {
+      setCurrentTrackIndex((prev) => prev - 1);
+      onPreviousTrack?.();
+    }
+  }, [currentTrackIndex, onPreviousTrack]);
+
+  // EQ controls
+  const updateEQBand = useCallback((index: number, gain: number) => {
+    setEqBands((prev) => {
+      const newBands = [...prev];
+      newBands[index].gain = gain;
+      return newBands;
+    });
+
+    if (eqNodesRef.current[index]) {
+      eqNodesRef.current[index].gain.value = gain;
+    }
+  }, []);
+
+  const resetEQ = useCallback(() => {
+    setEqBands((prev) => prev.map((band) => ({ ...band, gain: 0 })));
+    eqNodesRef.current.forEach((node) => {
+      node.gain.value = 0;
+    });
+  }, []);
+
+  // Enhanced seek function
+  const seekToTime = useCallback(
+    (time: number) => {
+      if (hasWaveform && wavesurfer.current) {
+        wavesurfer.current.seekTo(time / duration);
+      } else if (audioRef.current) {
+        audioRef.current.currentTime = time;
+      }
+    },
+    [hasWaveform, duration]
+  );
+
+  // Expose functions globally for keyboard shortcuts
   useEffect(() => {
     if (typeof window !== "undefined") {
       (window as any).seekToAudioTime = seekToTime;
       (window as any).togglePlayPause = togglePlayPause;
-      (window as any).nextTrack = () => {
-        // This will be handled by the parent component
-        const event = new CustomEvent("nextTrack");
-        window.dispatchEvent(event);
-      };
-      (window as any).previousTrack = () => {
-        // This will be handled by the parent component
-        const event = new CustomEvent("previousTrack");
-        window.dispatchEvent(event);
-      };
+      (window as any).nextTrack = playNextTrack;
+      (window as any).previousTrack = playPreviousTrack;
       (window as any).volumeUp = () => adjustVolume(0.1);
       (window as any).volumeDown = () => adjustVolume(-0.1);
       (window as any).toggleMute = toggleMute;
       (window as any).restart = restart;
       (window as any).changePlaybackSpeed = changePlaybackSpeed;
+      (window as any).toggleFullscreen = () => setIsFullscreen(!isFullscreen);
     }
-  }, [hasWaveform, duration, volume]);
+  }, [seekToTime, playNextTrack, playPreviousTrack, isFullscreen]);
 
-  // WaveSurfer setup
+  // WaveSurfer setup (enhanced)
   useEffect(() => {
     let isMounted = true;
+    let wavesurferInstance: any = null;
 
     const initWaveSurfer = async () => {
       try {
-        console.log("Loading WaveSurfer...");
-
-        if (!waveformRef.current) {
-          console.log("Container not ready");
-          return;
-        }
+        if (!waveformRef.current) return;
 
         const WaveSurfer = (await import("wavesurfer.js")).default;
 
+        // Safely destroy existing instance
         if (wavesurfer.current) {
-          wavesurfer.current.destroy();
+          try {
+            wavesurfer.current.destroy();
+          } catch (error) {
+            console.warn(
+              "Error destroying previous WaveSurfer instance:",
+              error
+            );
+          }
+          wavesurfer.current = null;
         }
 
-        wavesurfer.current = WaveSurfer.create({
+        // Create new instance
+        wavesurferInstance = WaveSurfer.create({
           container: waveformRef.current,
           waveColor: "#525252",
           progressColor: "#f5f5f5",
@@ -155,427 +344,247 @@ export default function AudioPlayer({
           barWidth: 2,
           barRadius: 2,
           barGap: 1,
-          height: 80,
+          height: 120,
           normalize: true,
+          interact: true,
+          hideScrollbar: true,
+          autoCenter: true,
         });
 
-        wavesurfer.current.load(audioUrl);
+        wavesurfer.current = wavesurferInstance;
 
-        wavesurfer.current.on("ready", () => {
-          console.log("WaveSurfer ready!");
-          if (isMounted) {
+        // Load audio with error handling
+        try {
+          await wavesurferInstance.load(audioUrl);
+        } catch (loadError) {
+          console.error("Error loading audio:", loadError);
+          return;
+        }
+
+        wavesurferInstance.on("ready", () => {
+          if (isMounted && wavesurferInstance) {
             setHasWaveform(true);
-            setDuration(wavesurfer.current.getDuration());
+            setDuration(wavesurferInstance.getDuration());
             addCommentMarkers();
           }
         });
 
-        wavesurfer.current.on("audioprocess", () => {
-          if (isMounted) {
-            const time = wavesurfer.current.getCurrentTime();
-            setCurrentTime(time);
+        wavesurferInstance.on("audioprocess", () => {
+          if (isMounted && wavesurferInstance) {
+            try {
+              const time = wavesurferInstance.getCurrentTime();
+              setCurrentTime(time);
 
-            // Handle looping for WaveSurfer - use ref for current state
-            const currentLoopState = loopStateRef.current;
-            if (
-              currentLoopState.isLooping &&
-              currentLoopState.loopStart !== null &&
-              currentLoopState.loopEnd !== null &&
-              time >= currentLoopState.loopEnd
-            ) {
-              console.log("Loop: jumping to start");
-              wavesurfer.current.seekTo(currentLoopState.loopStart / duration);
+              if (
+                isLooping &&
+                loopStart !== null &&
+                loopEnd !== null &&
+                time >= loopEnd
+              ) {
+                wavesurferInstance.seekTo(loopStart / duration);
+              }
+            } catch (error) {
+              console.warn("Error in audioprocess:", error);
             }
           }
         });
 
-        wavesurfer.current.on("play", () => {
+        wavesurferInstance.on("play", () => {
           if (isMounted) setIsPlaying(true);
         });
 
-        wavesurfer.current.on("pause", () => {
+        wavesurferInstance.on("pause", () => {
           if (isMounted) setIsPlaying(false);
         });
 
-        wavesurfer.current.on("error", (error: any) => {
+        wavesurferInstance.on("error", (error: any) => {
           console.error("WaveSurfer error:", error);
         });
 
-        // Note: Alt+Click handler will be added in separate useEffect to ensure fresh handleLoopSelection reference
-
-        wavesurfer.current.on("click", (progress: number) => {
+        // Enhanced click handling
+        wavesurferInstance.on("click", (progress: number) => {
           if (isMounted) {
             const clickTime = progress * duration;
-            console.log("WaveSurfer click at time:", clickTime);
 
-            // Only handle timestamp comments if Alt is not pressed
-            // (Alt+Click is handled by mousedown event above)
             if (
               typeof window !== "undefined" &&
               (window as any).setCommentTimestamp
             ) {
-              console.log("Handling timestamp comment");
               (window as any).setCommentTimestamp(clickTime);
-            } else {
-              console.log("Regular WaveSurfer click - no special action");
             }
           }
         });
       } catch (error) {
-        console.error("Failed to load WaveSurfer:", error);
+        console.error("Failed to initialize WaveSurfer:", error);
       }
     };
 
-    const timeout = setTimeout(initWaveSurfer, 100);
+    initWaveSurfer();
 
     return () => {
       isMounted = false;
-      clearTimeout(timeout);
+
+      // Safely destroy WaveSurfer instance
+      if (wavesurferInstance) {
+        try {
+          wavesurferInstance.destroy();
+        } catch (error) {
+          console.warn("Error destroying WaveSurfer instance:", error);
+        }
+        wavesurferInstance = null;
+      }
+
       if (wavesurfer.current) {
-        wavesurfer.current.destroy();
+        wavesurfer.current = null;
       }
     };
-  }, [audioUrl, duration]);
+  }, [audioUrl, duration, isLooping, loopStart, loopEnd]);
 
-  // Add comment markers to waveform
-  const addCommentMarkers = () => {
-    if (!hasWaveform || !wavesurfer.current || !duration) return;
+  // Comment markers
+  const addCommentMarkers = useCallback(() => {
+    if (!wavesurfer.current || !hasWaveform) return;
 
     comments.forEach((comment, index) => {
-      if (comment.audioTimestamp !== undefined) {
-        const position = (comment.audioTimestamp / duration) * 100;
-
-        // Create marker element
-        const marker = document.createElement("div");
-        marker.style.position = "absolute";
-        marker.style.left = `${position}%`;
-        marker.style.top = "0";
-        marker.style.bottom = "0";
-        marker.style.width = "2px";
-        marker.style.backgroundColor = "#3b82f6";
-        marker.style.zIndex = "10";
-        marker.style.cursor = "pointer";
-        marker.style.opacity = "0.8";
-        marker.title = `Comment at ${formatTime(comment.audioTimestamp)}`;
-
-        // Add hover effect
-        marker.addEventListener("mouseenter", () => {
-          marker.style.backgroundColor = "#60a5fa";
-          marker.style.width = "3px";
+      if (comment.audioTimestamp !== undefined && duration > 0) {
+        const position = comment.audioTimestamp / duration;
+        wavesurfer.current.addMarker({
+          time: comment.audioTimestamp,
+          color: "#3b82f6",
+          position: "top",
         });
-        marker.addEventListener("mouseleave", () => {
-          marker.style.backgroundColor = "#3b82f6";
-          marker.style.width = "2px";
-        });
-
-        waveformRef.current?.appendChild(marker);
       }
     });
-  };
+  }, [comments, duration, hasWaveform]);
 
-  // Add loop overlay to waveform
-  const addLoopOverlay = () => {
-    if (
-      !hasWaveform ||
-      !wavesurfer.current ||
-      !duration ||
-      loopStart === null ||
-      loopEnd === null
-    )
-      return;
-
-    // Remove existing loop overlay
-    const existingOverlay = waveformRef.current?.querySelector(".loop-overlay");
-    if (existingOverlay) {
-      existingOverlay.remove();
-    }
-
-    const startPercent = (loopStart / duration) * 100;
-    const endPercent = (loopEnd / duration) * 100;
-    const width = endPercent - startPercent;
-
-    // Create loop overlay element
-    const overlay = document.createElement("div");
-    overlay.className = "loop-overlay";
-    overlay.style.position = "absolute";
-    overlay.style.left = `${startPercent}%`;
-    overlay.style.top = "0";
-    overlay.style.bottom = "0";
-    overlay.style.width = `${width}%`;
-    overlay.style.backgroundColor = isLooping
-      ? "rgba(34, 197, 94, 0.2)"
-      : "rgba(234, 179, 8, 0.2)";
-    overlay.style.border = isLooping
-      ? "1px solid rgba(34, 197, 94, 0.5)"
-      : "1px solid rgba(234, 179, 8, 0.5)";
-    overlay.style.zIndex = "5";
-    overlay.style.pointerEvents = "none";
-    overlay.title = `Loop: ${formatTime(loopStart)} - ${formatTime(loopEnd)}`;
-
-    waveformRef.current?.appendChild(overlay);
-  };
-
-  // Update markers when comments change
-  useEffect(() => {
-    if (hasWaveform) {
-      // Clear existing markers
-      const markers = waveformRef.current?.querySelectorAll(
-        '[title*="Comment at"]'
-      );
-      markers?.forEach((marker) => marker.remove());
-
-      // Add new markers
-      addCommentMarkers();
-    }
-  }, [comments, hasWaveform, duration]);
-
-  // Update loop overlay when loop state changes
-  useEffect(() => {
-    if (hasWaveform) {
-      addLoopOverlay();
-    }
-  }, [hasWaveform, duration, loopStart, loopEnd, isLooping]);
-
-  // Close speed dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showSpeedDropdown) {
-        const target = event.target as HTMLElement;
-        if (!target.closest(".relative")) {
-          setShowSpeedDropdown(false);
-        }
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showSpeedDropdown]);
-
-  // Apply playback speed when WaveSurfer is ready
-  useEffect(() => {
-    if (hasWaveform && wavesurfer.current && playbackSpeed !== 1) {
-      wavesurfer.current.setPlaybackRate(playbackSpeed);
-    }
-  }, [hasWaveform, playbackSpeed]);
-
-  // Use ref to track current state and bypass React timing
-  const loopStateRef = useRef({ loopStart, loopEnd, isLooping });
+  // Loop functionality
+  const loopStateRef = useRef({ isLooping, loopStart, loopEnd });
 
   useEffect(() => {
-    loopStateRef.current = { loopStart, loopEnd, isLooping };
-  }, [loopStart, loopEnd, isLooping]);
-
-  // Loop functions - using useCallback to avoid stale closure issues
-  const handleLoopSelection = useCallback(
-    (time: number) => {
-      // Use ref values to avoid stale closure
-      const currentState = loopStateRef.current;
-
-      if (currentState.loopStart === null) {
-        // First click - set start
-        console.log("Setting loop start:", time);
-        setLoopStart(time);
-        setLoopEnd(null);
-        setIsLooping(false);
-      } else if (currentState.loopEnd === null) {
-        // Second click - set end and enable loop
-        const start = Math.min(currentState.loopStart, time);
-        const end = Math.max(currentState.loopStart, time);
-        console.log("Setting loop end and enabling:", start, "to", end);
-        setLoopStart(start);
-        setLoopEnd(end);
-        setIsLooping(true);
-      } else {
-        // Third click - clear loop
-        console.log("Clearing loop");
-        setLoopStart(null);
-        setLoopEnd(null);
-        setIsLooping(false);
-      }
-    },
-    [loopStart, loopEnd, isLooping]
-  );
-
-  const toggleLoop = useCallback(() => {
-    console.log("toggleLoop called", { loopStart, loopEnd, isLooping });
-    if (loopStart !== null && loopEnd !== null) {
-      const newLoopState = !isLooping;
-      console.log("Toggling loop to:", newLoopState);
-      setIsLooping(newLoopState);
-    } else {
-      console.log("Cannot toggle loop - no loop points set");
-    }
-  }, [loopStart, loopEnd, isLooping]);
+    loopStateRef.current = { isLooping, loopStart, loopEnd };
+  }, [isLooping, loopStart, loopEnd]);
 
   const clearLoop = useCallback(() => {
+    setIsLooping(false);
     setLoopStart(null);
     setLoopEnd(null);
-    setIsLooping(false);
+    setIsSelecting(false);
+    setSelectionStart(null);
   }, []);
 
-  // Separate useEffect for Alt+Click handler to ensure fresh handleLoopSelection reference
-  useEffect(() => {
-    const waveformContainer = waveformRef.current;
-    if (!waveformContainer || !hasWaveform) return;
-
-    const handleAltClick = (e: MouseEvent) => {
-      if (e.altKey) {
-        e.preventDefault();
-        const rect = waveformContainer.getBoundingClientRect();
-        const progress = (e.clientX - rect.left) / rect.width;
-        const clickTime = progress * duration;
-        console.log("Alt+Click at time:", clickTime);
-        handleLoopSelection(clickTime);
+  const handleLoopSelection = useCallback(
+    (time: number) => {
+      if (!isSelecting) {
+        setIsSelecting(true);
+        setSelectionStart(time);
+        setLoopStart(time);
+      } else {
+        setIsSelecting(false);
+        setLoopEnd(time);
+        if (selectionStart !== null && time > selectionStart) {
+          setIsLooping(true);
+        }
       }
-    };
+    },
+    [isSelecting, selectionStart]
+  );
 
-    waveformContainer.addEventListener("mousedown", handleAltClick);
-    return () =>
-      waveformContainer.removeEventListener("mousedown", handleAltClick);
-  }, [hasWaveform, duration, handleLoopSelection]);
-
-  // Keyboard shortcuts
+  // Enhanced keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger shortcuts if user is typing in an input/textarea
       if (
         e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        e.target instanceof HTMLSelectElement ||
-        (e.target as HTMLElement)?.contentEditable === "true"
+        e.target instanceof HTMLTextAreaElement
       ) {
         return;
       }
 
-      switch (e.code) {
-        case "Space":
+      const { key, ctrlKey, metaKey, shiftKey } = event as any;
+      const modifier = ctrlKey || metaKey;
+
+      switch (key) {
+        case " ":
           e.preventDefault();
           togglePlayPause();
           break;
-
-        case "ArrowLeft":
-          e.preventDefault();
-          seekRelative(-10); // Seek back 10 seconds
-          break;
-
         case "ArrowRight":
           e.preventDefault();
-          seekRelative(10); // Seek forward 10 seconds
+          if (modifier) {
+            seekRelative(10);
+          } else {
+            playNextTrack();
+          }
           break;
-
+        case "ArrowLeft":
+          e.preventDefault();
+          if (modifier) {
+            seekRelative(-10);
+          } else {
+            playPreviousTrack();
+          }
+          break;
         case "ArrowUp":
           e.preventDefault();
-          adjustVolume(0.1); // Increase volume
+          adjustVolume(0.1);
           break;
-
         case "ArrowDown":
           e.preventDefault();
-          adjustVolume(-0.1); // Decrease volume
+          adjustVolume(-0.1);
           break;
-
-        case "Digit1":
-          e.preventDefault();
-          changePlaybackSpeed(0.5);
-          break;
-
-        case "Digit2":
-          e.preventDefault();
-          changePlaybackSpeed(0.75);
-          break;
-
-        case "Digit3":
-          e.preventDefault();
-          changePlaybackSpeed(1);
-          break;
-
-        case "Digit4":
-          e.preventDefault();
-          changePlaybackSpeed(1.25);
-          break;
-
-        case "Digit5":
-          e.preventDefault();
-          changePlaybackSpeed(1.5);
-          break;
-
-        case "Digit6":
-          e.preventDefault();
-          changePlaybackSpeed(2);
-          break;
-
-        case "KeyR":
-          e.preventDefault();
-          restart();
-          break;
-
-        case "KeyM":
+        case "m":
           e.preventDefault();
           toggleMute();
           break;
-
-        case "KeyL":
+        case "l":
           e.preventDefault();
-          toggleLoop();
+          setIsLooping(!isLooping);
           break;
-
-        case "KeyC":
-          if (e.shiftKey) {
-            e.preventDefault();
-            clearLoop();
-          }
-          break;
-
-        case "Slash":
-          if (e.shiftKey) {
-            // Shift + / = ?
-            e.preventDefault();
-            setShowKeyboardHelp(!showKeyboardHelp);
-          }
-          break;
-
-        case "Escape":
+        case "r":
           e.preventDefault();
-          setShowKeyboardHelp(false);
-          setShowSpeedDropdown(false);
+          restart();
+          break;
+        case "f":
+          e.preventDefault();
+          setIsFullscreen(!isFullscreen);
+          break;
+        case "e":
+          e.preventDefault();
+          setShowEQ(!showEQ);
+          break;
+        case "s":
+          e.preventDefault();
+          setShowSpectrum(!showSpectrum);
           break;
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [
-    hasWaveform,
-    duration,
-    volume,
-    isPlaying,
-    toggleLoop,
-    clearLoop,
-    showKeyboardHelp,
-  ]);
+  }, [isLooping, isFullscreen, showEQ, showSpectrum]);
 
-  // Helper functions for keyboard shortcuts
-  const seekRelative = (seconds: number) => {
-    if (hasWaveform && wavesurfer.current && duration) {
+  // Utility functions
+  const seekRelative = useCallback(
+    (seconds: number) => {
       const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
-      wavesurfer.current.seekTo(newTime / duration);
-    } else if (audioRef.current && duration) {
-      const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
-      audioRef.current.currentTime = newTime;
-    }
-  };
+      seekToTime(newTime);
+    },
+    [currentTime, duration, seekToTime]
+  );
 
-  const adjustVolume = (delta: number) => {
-    const newVolume = Math.max(0, Math.min(1, volume + delta));
-    setVolume(newVolume);
+  const adjustVolume = useCallback(
+    (delta: number) => {
+      const newVolume = Math.max(0, Math.min(1, volume + delta));
+      setVolume(newVolume);
 
-    if (hasWaveform && wavesurfer.current) {
-      wavesurfer.current.setVolume(newVolume);
-    } else if (audioRef.current) {
-      audioRef.current.volume = newVolume;
-    }
-  };
+      if (hasWaveform && wavesurfer.current) {
+        wavesurfer.current.setVolume(newVolume);
+      } else if (audioRef.current) {
+        audioRef.current.volume = newVolume;
+      }
+    },
+    [volume, hasWaveform]
+  );
 
-  const togglePlayPause = () => {
+  const togglePlayPause = useCallback(() => {
     if (hasWaveform && wavesurfer.current) {
       wavesurfer.current.playPause();
     } else if (audioRef.current) {
@@ -585,50 +594,41 @@ export default function AudioPlayer({
         audioRef.current.play();
       }
     }
-  };
+  }, [hasWaveform, isPlaying]);
 
-  const seek = (percentage: number) => {
-    if (hasWaveform && wavesurfer.current) {
-      wavesurfer.current.seekTo(percentage / 100);
-    } else if (audioRef.current && duration) {
-      audioRef.current.currentTime = (percentage / 100) * duration;
-    }
-  };
+  const seek = useCallback(
+    (percentage: number) => {
+      if (hasWaveform && wavesurfer.current) {
+        wavesurfer.current.seekTo(percentage / 100);
+      } else if (audioRef.current && duration) {
+        audioRef.current.currentTime = (percentage / 100) * duration;
+      }
+    },
+    [hasWaveform, duration]
+  );
 
-  const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const percentage = ((e.clientX - rect.left) / rect.width) * 100;
-    const clickTime = (percentage / 100) * duration;
+  const handleProgressBarClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const percentage = ((e.clientX - rect.left) / rect.width) * 100;
+      const clickTime = (percentage / 100) * duration;
 
-    console.log(
-      "Progress bar click at time:",
-      clickTime,
-      "altKey:",
-      e.altKey,
-      "shiftKey:",
-      e.shiftKey
-    );
+      if (e.altKey) {
+        handleLoopSelection(clickTime);
+      } else if (
+        e.shiftKey &&
+        typeof window !== "undefined" &&
+        (window as any).setCommentTimestamp
+      ) {
+        (window as any).setCommentTimestamp(clickTime);
+      } else {
+        seek(percentage);
+      }
+    },
+    [duration, handleLoopSelection, seek]
+  );
 
-    // If alt is held, handle loop selection
-    if (e.altKey) {
-      console.log("Handling loop selection for progress bar click");
-      handleLoopSelection(clickTime);
-    }
-    // If shift is held, add timestamp comment
-    else if (
-      e.shiftKey &&
-      typeof window !== "undefined" &&
-      (window as any).setCommentTimestamp
-    ) {
-      console.log("Handling timestamp comment");
-      (window as any).setCommentTimestamp(clickTime);
-    } else {
-      console.log("Regular progress bar click - seeking");
-      seek(percentage);
-    }
-  };
-
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     const newVolume = volume > 0 ? 0 : 1;
     setVolume(newVolume);
 
@@ -637,38 +637,43 @@ export default function AudioPlayer({
     } else if (audioRef.current) {
       audioRef.current.volume = newVolume;
     }
-  };
+  }, [volume, hasWaveform]);
 
-  const restart = () => {
+  const restart = useCallback(() => {
     if (hasWaveform && wavesurfer.current) {
       wavesurfer.current.seekTo(0);
     } else if (audioRef.current) {
       audioRef.current.currentTime = 0;
     }
-  };
+  }, [hasWaveform]);
 
-  const changePlaybackSpeed = (speed: number) => {
-    setPlaybackSpeed(speed);
-    setShowSpeedDropdown(false);
+  const changePlaybackSpeed = useCallback(
+    (speed: number) => {
+      setPlaybackSpeed(speed);
+      setShowSpeedDropdown(false);
 
-    if (hasWaveform && wavesurfer.current) {
-      wavesurfer.current.setPlaybackRate(speed);
-    } else if (audioRef.current) {
-      audioRef.current.playbackRate = speed;
-    }
-  };
+      if (hasWaveform && wavesurfer.current) {
+        wavesurfer.current.setPlaybackRate(speed);
+      } else if (audioRef.current) {
+        audioRef.current.playbackRate = speed;
+      }
+    },
+    [hasWaveform]
+  );
 
-  const formatTime = (seconds: number) => {
+  const formatTime = useCallback((seconds: number) => {
     if (!seconds || isNaN(seconds)) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
+  }, []);
 
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="audio-player p-8">
+    <div
+      className={`audio-player-enhanced ${isFullscreen ? "fullscreen" : ""}`}
+    >
       {/* Hidden HTML5 audio */}
       <audio
         ref={audioRef}
@@ -677,440 +682,380 @@ export default function AudioPlayer({
         className="hidden"
       />
 
-      {/* Player Interface */}
-      <div className="mb-8">
-        <div className="bg-neutral-800/30 rounded-xl p-6 relative">
-          {/* Waveform Container - Always Present */}
-          <div
-            ref={waveformRef}
-            className="w-full h-20 mb-4 relative cursor-pointer"
-            style={{ minHeight: "80px" }}
-            title={hasWaveform ? "Click to add timestamp comment" : undefined}
-          />
+      {/* Enhanced Player Interface */}
+      <div className="player-container">
+        {/* Header with track info and controls */}
+        <div className="player-header">
+          <div className="track-info">
+            <h2 className="track-title">{title}</h2>
+            {artist && <p className="track-artist">{artist}</p>}
+          </div>
 
-          {/* Fallback when no waveform */}
-          {!hasWaveform && (
-            <div className="absolute inset-6 flex flex-col items-center justify-center">
-              <div className="text-4xl mb-2">🎵</div>
-              <p className="text-sm text-neutral-400 mb-4">
-                Loading waveform...
-              </p>
+          <div className="header-controls">
+            <button
+              onClick={() => setShowEQ(!showEQ)}
+              className={`control-btn ${showEQ ? "active" : ""}`}
+              title="Toggle EQ (E)"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M3 6h18M7 12h10M9 18h6" />
+              </svg>
+            </button>
 
-              {/* Basic progress bar */}
-              <div className="w-full">
+            <button
+              onClick={() => setShowSpectrum(!showSpectrum)}
+              className={`control-btn ${showSpectrum ? "active" : ""}`}
+              title="Toggle Spectrum (S)"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M3 3v18h18M7 7l3 3-3 3M14 7l3 3-3 3" />
+              </svg>
+            </button>
+
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="control-btn"
+              title="Toggle Fullscreen (F)"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Main player area */}
+        <div className="player-main">
+          {/* Waveform */}
+          <div className="waveform-container">
+            <div
+              ref={waveformRef}
+              className="waveform"
+              style={{ minHeight: "120px" }}
+            />
+
+            {/* Fallback progress bar */}
+            {!hasWaveform && (
+              <div className="progress-fallback">
                 <div
-                  className="w-full bg-neutral-700/50 rounded-full h-2 cursor-pointer group mb-4 relative"
+                  className="progress-bar"
                   onClick={handleProgressBarClick}
-                  title="Click to seek, Shift+Click to add timestamp comment"
+                  title="Click to seek, Alt+Click for loop selection, Shift+Click for timestamp comment"
                 >
                   <div
-                    className="bg-neutral-300 h-2 rounded-full transition-all duration-100 group-hover:bg-neutral-200"
+                    className="progress-fill"
                     style={{ width: `${progressPercentage}%` }}
                   />
 
-                  {/* Loop region overlay for basic player */}
+                  {/* Loop region overlay */}
                   {loopStart !== null && loopEnd !== null && duration > 0 && (
                     <div
-                      className="absolute top-0 bottom-0 border-2 pointer-events-none"
+                      className="loop-overlay"
                       style={{
                         left: `${(loopStart / duration) * 100}%`,
                         width: `${((loopEnd - loopStart) / duration) * 100}%`,
-                        backgroundColor: isLooping
-                          ? "rgba(34, 197, 94, 0.15)"
-                          : "rgba(234, 179, 8, 0.15)",
-                        borderColor: isLooping
-                          ? "rgba(34, 197, 94, 0.4)"
-                          : "rgba(234, 179, 8, 0.4)",
                       }}
-                      title={`Loop: ${formatTime(loopStart)} - ${formatTime(
-                        loopEnd
-                      )}`}
                     />
                   )}
-
-                  {/* Comment markers for basic player */}
-                  {comments.map((comment, index) => {
-                    if (comment.audioTimestamp !== undefined && duration > 0) {
-                      const position =
-                        (comment.audioTimestamp / duration) * 100;
-                      return (
-                        <div
-                          key={`marker-${index}`}
-                          className="absolute top-0 bottom-0 w-0.5 bg-blue-400 opacity-80 hover:opacity-100"
-                          style={{ left: `${position}%` }}
-                          title={`Comment at ${formatTime(
-                            comment.audioTimestamp
-                          )}`}
-                        />
-                      );
-                    }
-                    return null;
-                  })}
                 </div>
 
-                <div className="text-center text-xs text-neutral-400">
+                <div className="time-display">
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Spectrum Analyzer */}
+          {showSpectrum && (
+            <div className="spectrum-container">
+              <canvas
+                ref={spectrumRef}
+                className="spectrum-canvas"
+                width={800}
+                height={60}
+              />
+            </div>
+          )}
+
+          {/* EQ Panel */}
+          {showEQ && (
+            <div className="eq-panel">
+              <div className="eq-header">
+                <h3>Equalizer</h3>
+                <button onClick={resetEQ} className="reset-btn">
+                  Reset
+                </button>
+              </div>
+              <div className="eq-controls">
+                {eqBands.map((band, index) => (
+                  <div key={index} className="eq-band">
+                    <input
+                      type="range"
+                      min="-12"
+                      max="12"
+                      step="0.1"
+                      value={band.gain}
+                      onChange={(e) =>
+                        updateEQBand(index, parseFloat(e.target.value))
+                      }
+                      className="eq-slider"
+                    />
+                    <span className="eq-label">{band.frequency}Hz</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
         </div>
 
-        {/* Hints */}
-        <div className="text-xs text-neutral-500 text-center mt-2 space-y-1">
-          <p>
-            {hasWaveform
-              ? "Click: timestamp comment • Alt+Click: loop selection"
-              : "Shift+Click: timestamp comment • Alt+Click: loop selection"}
-          </p>
-          <p className="text-neutral-600">
-            Press{" "}
-            <kbd className="px-1 py-0.5 bg-neutral-800 rounded text-[10px]">
-              ?
-            </kbd>{" "}
-            for keyboard shortcuts
-          </p>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <button onClick={togglePlayPause} className="play-button group">
-            {isPlaying ? (
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="transition-transform group-hover:scale-110"
-              >
-                <rect x="6" y="4" width="4" height="16" rx="1" />
-                <rect x="14" y="4" width="4" height="16" rx="1" />
-              </svg>
-            ) : (
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="ml-0.5 transition-transform group-hover:scale-110"
-              >
-                <polygon points="5,3 19,12 5,21" />
-              </svg>
-            )}
-          </button>
-
-          <div className="text-sm">
-            <div
-              className="font-medium mb-1 tracking-tight"
-              style={{ fontVariationSettings: "'wght' 500" }}
-            >
-              {title}
-            </div>
-            <div className="text-secondary text-xs tracking-wide">
-              {hasWaveform ? "Waveform active" : "Loading..."}
-            </div>
-          </div>
-        </div>
-
-        {/* Secondary controls */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={toggleMute}
-            className="p-3 hover:bg-neutral-800/50 rounded-xl transition-all duration-200 hover:scale-105 group"
-            title={volume > 0 ? "Mute" : "Unmute"}
-          >
-            {volume > 0 ? (
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="text-neutral-400 group-hover:text-neutral-300 transition-colors"
-              >
-                <polygon points="11,5 6,9 2,9 2,15 6,15 11,19" />
-                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
-              </svg>
-            ) : (
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="text-neutral-400 group-hover:text-neutral-300 transition-colors"
-              >
-                <polygon points="11,5 6,9 2,9 2,15 6,15 11,19" />
-                <line x1="23" y1="9" x2="17" y2="15" />
-                <line x1="17" y1="9" x2="23" y2="15" />
-              </svg>
-            )}
-          </button>
-
-          <button
-            onClick={restart}
-            className="p-3 hover:bg-neutral-800/50 rounded-xl transition-all duration-200 hover:scale-105 group"
-            title="Restart"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="text-neutral-400 group-hover:text-neutral-300 transition-colors"
-            >
-              <path d="M1 4v6h6" />
-              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-            </svg>
-          </button>
-
-          {/* Loop Control */}
-          <button
-            onClick={toggleLoop}
-            disabled={loopStart === null || loopEnd === null}
-            className={`p-3 rounded-xl transition-all duration-200 hover:scale-105 group ${
-              isLooping
-                ? "bg-green-600/20 hover:bg-green-600/30"
-                : loopStart !== null && loopEnd !== null
-                ? "hover:bg-neutral-800/50"
-                : "opacity-50 cursor-not-allowed"
-            }`}
-            title={
-              loopStart === null || loopEnd === null
-                ? "Alt+Click to select loop region"
-                : isLooping
-                ? `Loop active: ${formatTime(loopStart)} - ${formatTime(
-                    loopEnd
-                  )}`
-                : `Loop ready: ${formatTime(loopStart)} - ${formatTime(
-                    loopEnd
-                  )}`
-            }
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className={`transition-colors ${
-                isLooping
-                  ? "text-green-400"
-                  : loopStart !== null && loopEnd !== null
-                  ? "text-neutral-400 group-hover:text-neutral-300"
-                  : "text-neutral-600"
-              }`}
-            >
-              <path d="M11 19H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5" />
-              <path d="M13 5h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5" />
-              <circle cx="12" cy="12" r="3" />
-              <path d="M16 8l-4-4-4 4" />
-              <path d="M8 16l4 4 4-4" />
-            </svg>
-          </button>
-
-          {/* Speed Control */}
-          <div className="relative">
+        {/* Control Bar */}
+        <div className="control-bar">
+          {/* Transport Controls */}
+          <div className="transport-controls">
             <button
-              onClick={() => setShowSpeedDropdown(!showSpeedDropdown)}
-              className="px-3 py-2 hover:bg-neutral-800/50 rounded-xl transition-all duration-200 hover:scale-105 group flex items-center gap-1 min-w-[60px] justify-center"
-              title="Playback Speed"
+              onClick={playPreviousTrack}
+              className="control-btn"
+              disabled={currentTrackIndex === 0}
+              title="Previous Track (Ctrl+←)"
             >
-              <span className="text-sm font-medium text-neutral-400 group-hover:text-neutral-300 transition-colors">
-                {
-                  speedOptions.find((option) => option.value === playbackSpeed)
-                    ?.label
-                }
-              </span>
               <svg
-                width="12"
-                height="12"
+                width="20"
+                height="20"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
-                className={`text-neutral-400 group-hover:text-neutral-300 transition-all duration-200 ${
-                  showSpeedDropdown ? "rotate-180" : ""
-                }`}
               >
-                <polyline points="6,9 12,15 18,9" />
+                <polygon points="19,20 9,12 19,4" />
+                <line x1="5" y1="19" x2="5" y2="5" />
               </svg>
             </button>
 
-            {/* Speed Dropdown */}
-            {showSpeedDropdown && (
-              <div className="absolute bottom-full right-0 mb-2 bg-neutral-800 border border-neutral-700 rounded-xl shadow-xl z-50 min-w-[80px] overflow-hidden">
-                {speedOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => changePlaybackSpeed(option.value)}
-                    className={`w-full px-4 py-2 text-sm text-left hover:bg-neutral-700 transition-colors ${
-                      playbackSpeed === option.value
-                        ? "bg-neutral-700 text-neutral-200"
-                        : "text-neutral-400"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+            <button
+              onClick={togglePlayPause}
+              className="play-btn"
+              title="Play/Pause (Space)"
+            >
+              <svg
+                width="24"
+                height="24"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                {isPlaying ? (
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                ) : (
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+                    clipRule="evenodd"
+                  />
+                )}
+              </svg>
+            </button>
 
-      {/* Keyboard Shortcuts Help Modal */}
-      {showKeyboardHelp && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-neutral-900 border border-neutral-700 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-neutral-200">
-                Keyboard Shortcuts
-              </h3>
+            <button
+              onClick={playNextTrack}
+              className="control-btn"
+              disabled={currentTrackIndex >= queue.length - 1}
+              title="Next Track (Ctrl+→)"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <polygon points="5,4 15,12 5,20" />
+                <line x1="19" y1="5" x2="19" y2="19" />
+              </svg>
+            </button>
+
+            <button
+              onClick={restart}
+              className="control-btn"
+              title="Restart (R)"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                <path d="M3 21v-5h5" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Playback Controls */}
+          <div className="playback-controls">
+            <div className="speed-control">
               <button
-                onClick={() => setShowKeyboardHelp(false)}
-                className="p-1 hover:bg-neutral-800 rounded-lg transition-colors"
+                onClick={() => setShowSpeedDropdown(!showSpeedDropdown)}
+                className="speed-btn"
+                title="Playback Speed"
+              >
+                {playbackSpeed}x
+              </button>
+
+              {showSpeedDropdown && (
+                <div className="speed-dropdown">
+                  {speedOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => changePlaybackSpeed(option.value)}
+                      className={`speed-option ${
+                        playbackSpeed === option.value ? "active" : ""
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setIsLooping(!isLooping)}
+              className={`control-btn ${isLooping ? "active" : ""}`}
+              title="Toggle Loop (L)"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M17 2a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4h10z" />
+                <path d="M7 8l3 3-3 3" />
+                <path d="M17 8l-3 3 3 3" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Volume and Time */}
+          <div className="volume-time-controls">
+            <div className="volume-control">
+              <button
+                onClick={toggleMute}
+                className="control-btn"
+                title="Toggle Mute (M)"
               >
                 <svg
-                  width="16"
-                  height="16"
+                  width="20"
+                  height="20"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
-                  className="text-neutral-400"
                 >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
+                  {volume > 0 ? (
+                    <>
+                      <polygon points="11,5 6,9 2,9 2,15 6,15 11,19 11,5" />
+                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+                    </>
+                  ) : (
+                    <>
+                      <polygon points="11,5 6,9 2,9 2,15 6,15 11,19 11,5" />
+                      <line x1="23" y1="9" x2="17" y2="15" />
+                      <line x1="17" y1="9" x2="23" y2="15" />
+                    </>
+                  )}
                 </svg>
               </button>
+
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={volume}
+                onChange={(e) =>
+                  adjustVolume(parseFloat(e.target.value) - volume)
+                }
+                className="volume-slider"
+                title="Volume"
+              />
             </div>
 
-            <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-400">Play/Pause</span>
-                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
-                      Space
-                    </kbd>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-400">Seek Back</span>
-                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
-                      ←
-                    </kbd>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-400">Seek Forward</span>
-                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
-                      →
-                    </kbd>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-400">Volume Up</span>
-                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
-                      ↑
-                    </kbd>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-400">Volume Down</span>
-                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
-                      ↓
-                    </kbd>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-400">Restart</span>
-                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
-                      R
-                    </kbd>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-400">Mute/Unmute</span>
-                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
-                      M
-                    </kbd>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-400">Toggle Loop</span>
-                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
-                      L
-                    </kbd>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-400">Clear Loop</span>
-                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
-                      Shift+C
-                    </kbd>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-400">0.5x Speed</span>
-                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
-                      1
-                    </kbd>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-400">0.75x Speed</span>
-                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
-                      2
-                    </kbd>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-400">1x Speed</span>
-                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
-                      3
-                    </kbd>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-neutral-700 pt-3 mt-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-400">1.25x Speed</span>
-                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
-                      4
-                    </kbd>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-400">1.5x Speed</span>
-                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
-                      5
-                    </kbd>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-400">2x Speed</span>
-                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
-                      6
-                    </kbd>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-neutral-400">Toggle Help</span>
-                    <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">
-                      ?
-                    </kbd>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-xs text-neutral-500 text-center mt-4 pt-3 border-t border-neutral-700">
-                Shortcuts work when not typing in text fields • Press Esc to
-                close
-              </div>
+            <div className="time-display">
+              <span>{formatTime(currentTime)}</span>
+              <span className="time-separator">/</span>
+              <span>{formatTime(duration)}</span>
             </div>
           </div>
         </div>
-      )}
+
+        {/* Queue Panel */}
+        {queue.length > 0 && (
+          <div className="queue-panel">
+            <h3>Queue ({queue.length})</h3>
+            <div className="queue-list">
+              {queue.map((track, index) => (
+                <div
+                  key={index}
+                  className={`queue-item ${
+                    index === currentTrackIndex ? "current" : ""
+                  }`}
+                >
+                  <span className="queue-title">{track.title}</span>
+                  <span className="queue-artist">{track.artist}</span>
+                  <button
+                    onClick={() => removeFromQueue(index)}
+                    className="remove-btn"
+                    title="Remove from queue"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Hints */}
+      <div className="player-hints">
+        <p>
+          Space: Play/Pause • ←→: Seek • ↑↓: Volume • L: Loop • R: Restart • F:
+          Fullscreen • E: EQ • S: Spectrum
+        </p>
+      </div>
     </div>
   );
 }
