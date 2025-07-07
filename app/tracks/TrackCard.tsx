@@ -15,53 +15,21 @@ import {
   cardHover,
   fadeInUp,
 } from "../../components/animations/MotionComponents";
-
-interface TrackMetadata {
-  slug: string;
-  originalName: string;
-  filename: string;
-  title: string;
-  artist: string;
-  uploadedAt: string;
-  size: number;
-  type: string;
-  reactions: {
-    fire: number;
-    cry: number;
-    explode: number;
-    broken: number;
-  };
-}
-
-interface ExtendedTrackMetadata {
-  description?: string;
-  tags?: string[];
-  credits?: string[];
-  notes?: string;
-  genre?: string;
-  bpm?: number;
-  key?: string;
-  duration?: number;
-}
-
-interface TrackWithMetadata extends TrackMetadata {
-  extendedMetadata?: ExtendedTrackMetadata;
-}
+import { RecordModel } from "pocketbase";
 
 interface TrackCardProps {
-  track: TrackWithMetadata;
+  track: RecordModel;
   gradientFrom: string;
   gradientTo: string;
 }
 
 // Enhanced artwork generation with more sophisticated patterns
-function generateDynamicArtwork(track: TrackWithMetadata) {
-  const { title, artist, extendedMetadata } = track;
-  const genre = extendedMetadata?.genre || "Music";
-  const bpm = extendedMetadata?.bpm || 120;
+function generateDynamicArtwork(track: RecordModel) {
+  const { title, artist, genre, bpm } = track;
 
   // Create a unique seed based on track properties
-  const seed = title.length + artist.length + genre.length + (bpm % 100);
+  const seed =
+    title.length + artist.length + (genre?.length || 0) + ((bpm || 120) % 100);
 
   // Generate visual patterns based on track characteristics
   const patterns = [
@@ -91,8 +59,9 @@ function generateDynamicArtwork(track: TrackWithMetadata) {
   };
 
   const palette =
-    colorPalettes[genre.toLowerCase() as keyof typeof colorPalettes] ||
-    colorPalettes.pop;
+    colorPalettes[
+      (genre?.toLowerCase() as keyof typeof colorPalettes) || "pop"
+    ];
   const color1 = palette[seed % palette.length];
   const color2 = palette[(seed + 1) % palette.length];
 
@@ -102,7 +71,7 @@ function generateDynamicArtwork(track: TrackWithMetadata) {
       .replace("var(--color2)", color2),
     color1,
     color2,
-    intensity: (bpm / 200) * 0.8 + 0.2, // Higher BPM = more intense
+    intensity: ((bpm || 120) / 200) * 0.8 + 0.2, // Higher BPM = more intense
   };
 }
 
@@ -113,10 +82,23 @@ export function TrackCard({ track, gradientFrom, gradientTo }: TrackCardProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [artworkUrl, setArtworkUrl] = useState<string | null>(null);
 
-  const totalReactions = Object.values(track.reactions).reduce(
-    (sum, count) => sum + count,
+  const totalReactions = Object.values(track.reactions || {}).reduce(
+    (sum: number, count: unknown) => sum + (count as number),
     0
   );
+
+  const topReaction = useMemo(() => {
+    const reactions = track.reactions || {};
+    let topEmoji = "🔥";
+    let maxCount = 0;
+    for (const [emoji, count] of Object.entries(reactions)) {
+      if ((count as number) > maxCount) {
+        maxCount = count as number;
+        topEmoji = emoji;
+      }
+    }
+    return topEmoji;
+  }, [track.reactions]);
 
   // Generate dynamic artwork
   const artwork = useMemo(() => generateDynamicArtwork(track), [track]);
@@ -125,13 +107,13 @@ export function TrackCard({ track, gradientFrom, gradientTo }: TrackCardProps) {
     e.preventDefault();
     e.stopPropagation();
 
-    const audioUrl = `/uploads/${track.filename}`;
+    const audioUrl = `/api/stream/${track.audio}`;
     const playerTrack = {
-      slug: track.slug,
+      slug: track.id,
       title: track.title,
       artist: track.artist,
       audioUrl,
-      genre: track.extendedMetadata?.genre,
+      genre: track.genre,
     };
 
     playTrack(playerTrack);
@@ -158,12 +140,11 @@ export function TrackCard({ track, gradientFrom, gradientTo }: TrackCardProps) {
   };
 
   // Check if this track is currently playing
-  const isCurrentlyPlaying = currentTrack?.slug === track.slug;
+  const isCurrentlyPlaying = currentTrack?.slug === track.id;
 
   // Calculate card height based on content
-  const hasDescription = track.extendedMetadata?.description;
-  const hasTags =
-    track.extendedMetadata?.tags && track.extendedMetadata.tags.length > 0;
+  const hasDescription = track.description;
+  const hasTags = track.tags && track.tags.length > 0;
   const cardHeight = hasDescription || hasTags ? "h-auto" : "h-80";
 
   // Handle artwork generation
@@ -173,7 +154,7 @@ export function TrackCard({ track, gradientFrom, gradientTo }: TrackCardProps) {
 
   return (
     <FadeIn delay={0.1} className={`group relative ${cardHeight}`}>
-      <Link href={`/track/${track.slug}`} onClick={handleCardClick}>
+      <Link href={`/track/${track.id}`} onClick={handleCardClick}>
         <AnimatedCard
           className="track-card-enhanced"
           onMouseEnter={() => setIsHovered(true)}
@@ -184,7 +165,7 @@ export function TrackCard({ track, gradientFrom, gradientTo }: TrackCardProps) {
             <ArtworkGenerator
               title={track.title}
               artist={track.artist}
-              genre={track.extendedMetadata?.genre}
+              genre={track.genre}
               size="medium"
               onArtworkGenerated={handleArtworkGenerated}
               className="track-artwork"
@@ -263,84 +244,74 @@ export function TrackCard({ track, gradientFrom, gradientTo }: TrackCardProps) {
               <p className="track-artist-enhanced">{track.artist}</p>
             </div>
 
-            {/* Extended Metadata */}
-            {track.extendedMetadata && (
-              <div className="track-metadata">
-                {track.extendedMetadata.genre && (
-                  <span className="genre-badge">
-                    {track.extendedMetadata.genre}
-                  </span>
+            {/* Metadata */}
+            <div className="track-metadata-enhanced">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-neutral-400">
+                  {new Date(track.created).toLocaleDateString("en-GB", {
+                    year: "2-digit",
+                    month: "2-digit",
+                    day: "2-digit",
+                  })}
+                </span>
+                {isHovered && track.bpm && (
+                  <PulseBadge className="bg-purple-500/10 text-purple-300">
+                    {track.bpm} BPM
+                  </PulseBadge>
                 )}
-                {track.extendedMetadata.bpm && (
-                  <span className="bpm-badge">
-                    {track.extendedMetadata.bpm} BPM
-                  </span>
-                )}
-                {track.extendedMetadata.key && (
-                  <span className="key-badge">
-                    {track.extendedMetadata.key}
-                  </span>
+                {isHovered && track.key && (
+                  <PulseBadge className="bg-blue-500/10 text-blue-300">
+                    {track.key}
+                  </PulseBadge>
                 )}
               </div>
-            )}
+              {isHovered && totalReactions > 0 && (
+                <PulseBadge className="bg-amber-500/10 text-amber-300">
+                  {totalReactions} {topReaction}
+                </PulseBadge>
+              )}
+            </div>
 
             {/* Description */}
-            {track.extendedMetadata?.description && (
-              <p className="track-description">
-                {track.extendedMetadata.description}
-              </p>
+            {track.description && (
+              <p className="track-description">{track.description}</p>
             )}
 
             {/* Tags */}
-            {track.extendedMetadata?.tags &&
-              track.extendedMetadata.tags.length > 0 && (
-                <div className="track-tags">
-                  {track.extendedMetadata.tags.slice(0, 3).map((tag, index) => (
-                    <span key={index} className="tag">
-                      #{tag}
-                    </span>
-                  ))}
-                  {track.extendedMetadata.tags.length > 3 && (
-                    <span className="tag-more">
-                      +{track.extendedMetadata.tags.length - 3}
-                    </span>
-                  )}
-                </div>
-              )}
-
-            {/* Reactions */}
-            <div className="track-reactions">
-              <div className="reaction-stats">
-                <span className="reaction-count">
-                  {totalReactions} reactions
-                </span>
+            {track.tags && track.tags.length > 0 && (
+              <div className="track-tags">
+                {track.tags.slice(0, 3).map((tag: string, index: number) => (
+                  <span key={index} className="tag">
+                    #{tag}
+                  </span>
+                ))}
+                {track.tags.length > 3 && (
+                  <span className="tag-more">+{track.tags.length - 3}</span>
+                )}
               </div>
-            </div>
+            )}
 
             {/* Action Buttons */}
-            <div
+            <motion.div
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ duration: 0.2 }}
               className="track-actions-enhanced"
-              onClick={(e) => e.stopPropagation()}
             >
-              <div className="action-group">
-                <ShareButton
-                  url={`/track/${track.slug}`}
-                  title={track.title}
-                  artist={track.artist}
-                  currentTime={isCurrentlyPlaying ? currentTime : undefined}
-                />
-
-                {/* <AddToPlaylistButton
-                  track={{
-                    slug: track.slug,
-                    title: track.title,
-                    artist: track.artist,
-                    audioUrl: `/uploads/${track.filename}`,
-                    genre: track.extendedMetadata?.genre,
-                  }}
-                /> */}
-              </div>
-            </div>
+              <ShareButton
+                url={`/track/${track.id}`}
+                title={track.title}
+                artist={track.artist}
+              />
+              <AddToPlaylistButton
+                track={{
+                  slug: track.id,
+                  title: track.title,
+                  artist: track.artist,
+                  audioUrl: `/api/stream/${track.audio}`,
+                  genre: track.genre,
+                }}
+              />
+            </motion.div>
           </div>
         </AnimatedCard>
       </Link>

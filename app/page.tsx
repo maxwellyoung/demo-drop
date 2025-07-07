@@ -9,7 +9,7 @@ import {
   FadeIn,
   AnimatedButton,
 } from "../components/animations/MotionComponents";
-import pb from "../lib/pocketbase";
+import pb from "@demodrop/shared/src/pocketbase";
 
 export default function HomePage() {
   const [isDragOver, setIsDragOver] = useState(false);

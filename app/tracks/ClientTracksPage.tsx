@@ -14,41 +14,7 @@ import { useRouter } from "next/navigation";
 import { TrackCard } from "./TrackCard";
 import EnhancedSearchBar from "@/components/EnhancedSearchBar";
 import CloudSyncStatusBar from "@/components/CloudSyncStatusBar";
-
-interface TrackMetadata {
-  slug: string;
-  originalName: string;
-  filename: string;
-  title: string;
-  artist: string;
-  uploadedAt: string;
-  size: number;
-  type: string;
-  reactions: {
-    fire: number;
-    cry: number;
-    explode: number;
-    broken: number;
-  };
-  extendedMetadata?: {
-    description?: string;
-    tags?: string[];
-    credits?: string[];
-    notes?: string;
-    genre?: string;
-    bpm?: number;
-    key?: string;
-    duration?: number;
-  };
-  audioMetadata?: {
-    duration: number;
-    bitrate: number;
-    sampleRate: number;
-    channels: number;
-  };
-}
-
-interface TrackWithMetadata extends TrackMetadata {}
+import { RecordModel } from "pocketbase";
 
 interface Filters {
   search: string;
@@ -88,7 +54,7 @@ function generateTrackGradient(title: string, artist: string, genre?: string) {
 }
 
 interface ClientTracksPageProps {
-  tracks: TrackWithMetadata[];
+  tracks: RecordModel[];
 }
 
 export function ClientTracksPage({ tracks }: ClientTracksPageProps) {
@@ -113,11 +79,11 @@ export function ClientTracksPage({ tracks }: ClientTracksPageProps) {
     const tags = new Set<string>();
 
     tracks.forEach((track) => {
-      if (track.extendedMetadata?.genre) {
-        genres.add(track.extendedMetadata.genre);
+      if (track.genre) {
+        genres.add(track.genre);
       }
-      if (track.extendedMetadata?.tags) {
-        track.extendedMetadata.tags.forEach((tag: string) => tags.add(tag));
+      if (track.tags) {
+        track.tags.forEach((tag: string) => tags.add(tag));
       }
     });
 
@@ -136,10 +102,8 @@ export function ClientTracksPage({ tracks }: ClientTracksPageProps) {
         const matchesSearch =
           track.title.toLowerCase().includes(searchTerm) ||
           track.artist.toLowerCase().includes(searchTerm) ||
-          track.extendedMetadata?.description
-            ?.toLowerCase()
-            .includes(searchTerm) ||
-          track.extendedMetadata?.tags?.some((tag: string) =>
+          track.description?.toLowerCase().includes(searchTerm) ||
+          track.tags?.some((tag: string) =>
             tag.toLowerCase().includes(searchTerm)
           );
 
@@ -147,13 +111,13 @@ export function ClientTracksPage({ tracks }: ClientTracksPageProps) {
       }
 
       // Genre filter
-      if (filters.genre && track.extendedMetadata?.genre !== filters.genre) {
+      if (filters.genre && track.genre !== filters.genre) {
         return false;
       }
 
       // BPM filter
-      if (track.extendedMetadata?.bpm) {
-        const bpm = track.extendedMetadata.bpm;
+      if (track.bpm) {
+        const bpm = track.bpm;
         if (bpm < filters.bpmRange[0] || bpm > filters.bpmRange[1]) {
           return false;
         }
@@ -161,7 +125,7 @@ export function ClientTracksPage({ tracks }: ClientTracksPageProps) {
 
       // Tags filter
       if (filters.tags.length > 0) {
-        const trackTags = track.extendedMetadata?.tags || [];
+        const trackTags = track.tags || [];
         const hasMatchingTag = filters.tags.some((filterTag) =>
           trackTags.includes(filterTag)
         );
@@ -175,23 +139,19 @@ export function ClientTracksPage({ tracks }: ClientTracksPageProps) {
     result.sort((a, b) => {
       switch (filters.sortBy) {
         case "newest":
-          return (
-            new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-          );
+          return new Date(b.created).getTime() - new Date(a.created).getTime();
         case "oldest":
-          return (
-            new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime()
-          );
+          return new Date(a.created).getTime() - new Date(b.created).getTime();
         case "title":
           return a.title.localeCompare(b.title);
         case "artist":
           return a.artist.localeCompare(b.artist);
         case "reactions":
-          const aReactions = Object.values(a.reactions).reduce(
+          const aReactions = Object.values(a.reactions || {}).reduce(
             (sum: number, count: any) => sum + count,
             0
           );
-          const bReactions = Object.values(b.reactions).reduce(
+          const bReactions = Object.values(b.reactions || {}).reduce(
             (sum: number, count: any) => sum + count,
             0
           );
@@ -243,12 +203,11 @@ export function ClientTracksPage({ tracks }: ClientTracksPageProps) {
     setFocusedTrackIndex(-1);
   }, [filteredTracks]);
 
-  const createPlayerTrack = (track: TrackWithMetadata) => ({
-    slug: track.slug,
+  const createPlayerTrack = (track: RecordModel) => ({
+    slug: track.id,
     title: track.title,
     artist: track.artist,
-    audioUrl: `/uploads/${track.filename}`,
-    genre: track.extendedMetadata?.genre,
+    audioUrl: `/api/stream/${track.audio}`,
   });
 
   const handleTagToggle = (tag: string) => {
@@ -279,18 +238,21 @@ export function ClientTracksPage({ tracks }: ClientTracksPageProps) {
     filters.sortBy !== "newest";
 
   // Calculate quick stats
-  const stats = {
-    totalTracks: tracks.length,
-    totalReactions: tracks.reduce(
-      (sum, track) =>
-        sum + Object.values(track.reactions).reduce((a, b) => a + b, 0),
-      0
-    ),
-    uniqueArtists: new Set(tracks.map((track) => track.artist)).size,
-    genres: new Set(
-      tracks.map((track) => track.extendedMetadata?.genre).filter(Boolean)
-    ).size,
-  };
+  const stats = useMemo(() => {
+    return {
+      totalTracks: tracks.length,
+      totalReactions: tracks.reduce((sum: number, track: RecordModel) => {
+        const reactions = track.reactions || {};
+        const reactionCount = Object.values(reactions).reduce(
+          (a: number, b: number) => a + b,
+          0
+        );
+        return sum + (reactionCount || 0);
+      }, 0),
+      uniqueArtists: new Set(tracks.map((track) => track.artist)).size,
+      genres: new Set(tracks.map((track) => track.genre).filter(Boolean)).size,
+    };
+  }, [tracks]);
 
   // Power user feature handlers
   const handleBulkAction = useCallback((action: string, trackIds: string[]) => {
@@ -546,7 +508,7 @@ export function ClientTracksPage({ tracks }: ClientTracksPageProps) {
             <div className="tracks-list" ref={trackListRef}>
               {filteredTracks.map((track, index) => (
                 <TrackRow
-                  key={track.slug}
+                  key={track.id}
                   track={track}
                   index={index}
                   focused={focusedTrackIndex === index}
@@ -566,11 +528,11 @@ export function ClientTracksPage({ tracks }: ClientTracksPageProps) {
                 const [from, to] = generateTrackGradient(
                   track.title,
                   track.artist,
-                  track.extendedMetadata?.genre
+                  track.genre
                 );
                 return (
                   <TrackCard
-                    key={track.slug}
+                    key={track.id}
                     track={track}
                     gradientFrom={from}
                     gradientTo={to}

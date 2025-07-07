@@ -13,6 +13,7 @@ interface Reactions {
 interface ReactionsPanelProps {
   slug: string;
   reactions: Reactions;
+  userId: string;
 }
 
 const reactionEmojis = {
@@ -25,6 +26,7 @@ const reactionEmojis = {
 export default function ReactionsPanel({
   slug,
   reactions: initialReactions,
+  userId,
 }: ReactionsPanelProps) {
   const [reactions, setReactions] = useState(initialReactions);
   const [userReaction, setUserReaction] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export default function ReactionsPanel({
       await fetch(`/api/reactions/${slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, action: wasActive ? "remove" : "add" }),
+        body: JSON.stringify({ type, userId }),
       });
     } catch (error) {
       log.error("Failed to update reaction", { error });

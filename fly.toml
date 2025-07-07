@@ -1,7 +1,7 @@
-# fly.toml file generated for verse-api on 2024-08-07T22:00:00.000Z
+# fly.toml file generated for demo-drop on 2024-08-07T22:00:00.000Z
 
-app = "verse-api"
-primary_region = "sjc" # San Jose, CA. Change if you want.
+app = "demo-drop"
+primary_region = "sea" # Seattle, WA.
 
 [build]
 

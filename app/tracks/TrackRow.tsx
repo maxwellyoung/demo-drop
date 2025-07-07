@@ -5,9 +5,18 @@ import AddToPlaylistButton from "../../components/AddToPlaylistButton";
 import ArtworkGenerator from "../../components/ArtworkGenerator";
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { RecordModel } from "pocketbase";
+
+// Add this interface to match the one in AddToPlaylistButton
+interface Track {
+  slug: string;
+  title: string;
+  artist: string;
+  audioUrl: string;
+}
 
 interface TrackRowProps {
-  track: any;
+  track: RecordModel;
   index?: number;
   focused?: boolean;
   onFocus?: (e: React.FocusEvent) => void;
@@ -25,7 +34,7 @@ export function TrackRow({
 }: TrackRowProps) {
   const { playTrack, addToQueue, playerState } = usePlayer();
   const { currentTrack, currentTime } = playerState;
-  const isPlaying = currentTrack?.slug === track.slug;
+  const isPlaying = currentTrack?.slug === track.id;
   const [syncStatus, setSyncStatus] = useState<
     "synced" | "pending" | "failed" | null
   >(null);
@@ -42,7 +51,7 @@ export function TrackRow({
         const response = await fetch("/api/sync");
         const data = await response.json();
         const trackStatus = data.status?.find(
-          (s: any) => s.filename === track.filename
+          (s: any) => s.filename === track.audio
         );
         if (trackStatus) {
           if (trackStatus.syncError) setSyncStatus("failed");
@@ -54,7 +63,7 @@ export function TrackRow({
       }
     };
     checkSyncStatus();
-  }, [track.filename]);
+  }, [track.audio]);
 
   // Focus management
   useEffect(() => {
@@ -101,13 +110,13 @@ export function TrackRow({
     if (onPlay) {
       onPlay();
     } else {
-      const audioUrl = `/uploads/${track.filename}`;
+      const audioUrl = `/api/stream/${track.audio}`;
       const playerTrack = {
-        slug: track.slug,
+        slug: track.id,
         title: track.title,
         artist: track.artist,
         audioUrl,
-        genre: track.extendedMetadata?.genre,
+        genre: track.genre,
       };
       playTrack(playerTrack);
       addToQueue(playerTrack);
@@ -129,11 +138,20 @@ export function TrackRow({
     }
   };
 
+  const convertRecordToTrack = (record: RecordModel): Track => {
+    return {
+      slug: record.id,
+      title: record.title,
+      artist: record.artist,
+      audioUrl: `/api/stream/${record.audio}`,
+    };
+  };
+
   return (
     <>
       <Link
         ref={linkRef}
-        href={`/track/${track.slug}`}
+        href={`/track/${track.id}`}
         className={`track-row group ${
           focused ? "ring-2 ring-blue-500/50" : ""
         }`}
@@ -146,7 +164,7 @@ export function TrackRow({
           <ArtworkGenerator
             title={track.title}
             artist={track.artist}
-            genre={track.extendedMetadata?.genre}
+            genre={track.genre}
             size="small"
           />
         </div>
@@ -156,37 +174,35 @@ export function TrackRow({
           <div className="track-artist">{track.artist}</div>
           <div className="track-meta">
             {/* Enhanced metadata display */}
-            {track.audioMetadata?.duration && (
+            {track.duration && (
               <span className="text-xs text-gray-500">
-                {Math.floor(track.audioMetadata.duration / 60)}:
-                {(track.audioMetadata.duration % 60)
-                  .toFixed(0)
-                  .padStart(2, "0")}
+                {Math.floor(track.duration / 60)}:
+                {(track.duration % 60).toFixed(0).padStart(2, "0")}
               </span>
             )}
-            {track.audioMetadata?.bitrate && (
+            {track.bitrate && (
               <span className="hidden md:inline text-xs text-gray-500">
-                {Math.round(track.audioMetadata.bitrate / 1000)}kbps
+                {Math.round(track.bitrate / 1000)}kbps
               </span>
             )}
-            {track.extendedMetadata?.genre && (
+            {track.genre && (
               <span className="text-xs bg-gray-100 px-2 py-1 rounded">
-                {track.extendedMetadata.genre}
+                {track.genre}
               </span>
             )}
-            {track.extendedMetadata?.bpm && (
+            {track.bpm && (
               <span className="hidden md:inline text-xs bg-blue-100 px-2 py-1 rounded">
-                {track.extendedMetadata.bpm} BPM
+                {track.bpm} BPM
               </span>
             )}
-            {track.extendedMetadata?.key && (
+            {track.key && (
               <span className="hidden md:inline text-xs bg-purple-100 px-2 py-1 rounded">
-                {track.extendedMetadata.key}
+                {track.key}
               </span>
             )}
             {/* Upload date */}
             <span className="text-xs text-gray-400">
-              {new Date(track.uploadedAt).toLocaleDateString("en-GB")}
+              {new Date(track.created).toLocaleDateString("en-GB")}
             </span>
           </div>
         </div>
@@ -225,7 +241,7 @@ export function TrackRow({
             </button>
 
             <ShareButton
-              url={`/track/${track.slug}`}
+              url={`/track/${track.id}`}
               title={track.title}
               artist={track.artist}
               currentTime={isPlaying ? currentTime : undefined}
@@ -304,17 +320,7 @@ export function TrackRow({
             }}
           >
             <div className="py-1">
-              <button className="w-full px-4 py-2 text-left text-sm text-neutral-300 hover:bg-neutral-800/50 flex items-center space-x-2 transition-colors">
-                <svg
-                  width="14"
-                  height="14"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>Add to Playlist</span>
-              </button>
+              <AddToPlaylistButton track={convertRecordToTrack(track)} />
               <button className="w-full px-4 py-2 text-left text-sm text-neutral-300 hover:bg-neutral-800/50 flex items-center space-x-2 transition-colors">
                 <svg
                   width="14"

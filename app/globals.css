@@ -1784,23 +1784,16 @@
   }
 
   .track-actions-enhanced {
-    @apply flex items-center justify-between gap-3 pt-4 border-t border-neutral-800/30;
+    @apply absolute bottom-4 left-4 right-4 flex justify-between items-center;
   }
+}
 
-  .action-group {
-    @apply flex items-center gap-2;
-  }
-
-  /* Mobile optimizations for track actions */
-  @media (max-width: 640px) {
-    .track-actions-enhanced {
-      @apply gap-2;
-    }
-
-    .action-group {
-      @apply gap-1;
-    }
-  }
+.sidebar-card {
+  @apply bg-neutral-900/60 border border-neutral-800/60 rounded-2xl p-4 md:p-6 backdrop-blur-sm;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+.sidebar-title {
+  @apply text-base font-bold text-neutral-300 mb-4 tracking-wider uppercase;
 }
 
 /* Mobile-First Responsive Design */

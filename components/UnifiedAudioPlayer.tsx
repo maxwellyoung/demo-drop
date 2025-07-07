@@ -73,10 +73,15 @@ export default function UnifiedAudioPlayer({
   // Waveform state
   const [waveformReady, setWaveformReady] = useState(false);
   const [waveformError, setWaveformError] = useState(false);
+  const [isClient, setIsClient] = useState(false);
 
   // UI state
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Initialize WaveSurfer with proper error handling
   useEffect(() => {
@@ -331,33 +336,44 @@ export default function UnifiedAudioPlayer({
 
       {/* Waveform or progress bar */}
       <div className="waveform-section">
-        {waveformReady ? (
-          <div ref={waveformRef} className="waveform" />
-        ) : (
-          <div
-            ref={progressRef}
-            className="progress-bar-fallback"
-            onClick={handleProgressClick}
-          >
-            <div
-              className="progress-fill"
-              style={{ width: `${progressPercentage}%` }}
-            />
-            {/* Simplified waveform visualization when actual waveform fails */}
-            <div className="fake-waveform">
-              {Array.from({ length: 60 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="wave-bar"
-                  style={{
-                    height: `${Math.random() * 40 + 10}%`,
-                    opacity: i < (progressPercentage / 100) * 60 ? 0.8 : 0.3,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+        <div
+          className="relative w-full h-[60px] bg-neutral-800/50 rounded-lg overflow-hidden"
+          ref={progressRef}
+          onClick={handleProgressClick}
+        >
+          <AnimatePresence>
+            {waveformReady && (
+              <motion.div
+                ref={waveformRef}
+                className="w-full h-full"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              />
+            )}
+          </AnimatePresence>
+          <AnimatePresence>
+            {isClient && !waveformReady && (
+              <motion.div
+                className="absolute inset-0 flex items-center justify-between px-2"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                {[...Array(60)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="w-0.5 bg-neutral-600/50 rounded-full"
+                    style={{
+                      height: `${Math.random() * 70 + 10}%`,
+                      opacity: 0.3,
+                    }}
+                  />
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* Comment markers */}
         {comments.map((comment) => {

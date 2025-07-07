@@ -3,6 +3,7 @@
 import { usePlayer } from "./PersistentMiniPlayer";
 import ShareButton from "./ShareButton";
 import ReactionsPanel from "./ReactionsPanel";
+import { log } from "@/lib/logger";
 
 interface TrackActionsProps {
   shareUrl: string;
@@ -25,20 +26,23 @@ export default function TrackActions({
   reactions,
 }: TrackActionsProps) {
   const { playerState } = usePlayer();
-  const { currentTrack, currentTime } = playerState;
+  const { currentTrack } = playerState;
+
+  // TODO: Replace with actual logged-in user ID
+  const userId = "USER_ID_PLACEHOLDER";
 
   // Check if this track is currently playing
   const isCurrentlyPlaying = currentTrack?.slug === trackSlug;
 
   return (
-    <div className="flex flex-col sm:flex-row justify-center items-center gap-8 my-8">
-      <ShareButton
-        url={shareUrl}
-        title={title}
-        artist={artist}
-        currentTime={isCurrentlyPlaying ? currentTime : 0}
-      />
-      <ReactionsPanel slug={trackSlug} reactions={reactions} />
+    <div>
+      <div className="flex items-center gap-4">
+        <ReactionsPanel
+          slug={trackSlug}
+          reactions={reactions}
+          userId={userId}
+        />
+      </div>
     </div>
   );
 }

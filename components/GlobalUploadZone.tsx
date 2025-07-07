@@ -4,7 +4,8 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, X } from "lucide-react";
-import pb from "../lib/pocketbase";
+import pb from "@demodrop/shared/src/pocketbase";
+import { usePlayer } from "./PersistentMiniPlayer";
 
 interface GlobalUploadZoneProps {
   children: React.ReactNode;

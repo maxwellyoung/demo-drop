@@ -2,9 +2,10 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useKeyboardShortcuts } from "./KeyboardShortcutsProvider";
+import { RecordModel } from "pocketbase";
 
 interface PowerUserFeaturesProps {
-  tracks?: any[];
+  tracks?: RecordModel[];
   onBulkAction?: (action: string, trackIds: string[]) => void;
   onAdvancedSearch?: (query: string, filters: any) => void;
   onExportData?: (format: string) => void;
@@ -64,7 +65,7 @@ export default function PowerUserFeatures({
         if (selectedTracks.size === tracks.length) {
           setSelectedTracks(new Set());
         } else {
-          setSelectedTracks(new Set(tracks.map((track) => track.slug)));
+          setSelectedTracks(new Set(tracks.map((track) => track.id)));
         }
       }
     };
@@ -114,7 +115,7 @@ export default function PowerUserFeatures({
   const exportTracks = useCallback(
     (format: string) => {
       const selectedTracksData = tracks.filter(
-        (track) => selectedTracks.size === 0 || selectedTracks.has(track.slug)
+        (track) => selectedTracks.size === 0 || selectedTracks.has(track.id)
       );
 
       if (format === "json") {
@@ -135,16 +136,14 @@ export default function PowerUserFeatures({
           "Genre",
           "Duration",
           "Upload Date",
-          "Comments",
           "Reactions",
         ];
         const csvData = selectedTracksData.map((track) => [
           track.title,
           track.artist,
-          track.extendedMetadata?.genre || "",
-          track.extendedMetadata?.duration || "",
-          new Date(track.uploadedAt).toLocaleDateString(),
-          track.comments?.length || 0,
+          track.genre || "",
+          track.duration || "",
+          new Date(track.created).toLocaleDateString(),
           Object.values(track.reactions || {}).reduce((a, b) => {
             const aNum = typeof a === "number" ? a : 0;
             const bNum = typeof b === "number" ? b : 0;
@@ -153,7 +152,7 @@ export default function PowerUserFeatures({
         ]);
 
         const csvContent = [headers, ...csvData]
-          .map((row) => row.map((cell) => `"${cell}"`).join(","))
+          .map((row) => row.map((cell) => `"${String(cell)}"`).join(","))
           .join("\n");
 
         const blob = new Blob([csvContent], { type: "text/csv" });
@@ -291,7 +290,7 @@ export default function PowerUserFeatures({
                           <button
                             onClick={() =>
                               setSelectedTracks(
-                                new Set(tracks.map((t) => t.slug))
+                                new Set(tracks.map((t) => t.id))
                               )
                             }
                             className="btn-secondary text-xs px-3 py-1"
@@ -307,10 +306,10 @@ export default function PowerUserFeatures({
                                       (t) =>
                                         t.reactions &&
                                         Object.values(t.reactions).some(
-                                          (v) => v > 0
+                                          (v) => typeof v === "number" && v > 0
                                         )
                                     )
-                                    .map((t) => t.slug)
+                                    .map((t) => t.id)
                                 )
                               )
                             }
@@ -326,7 +325,7 @@ export default function PowerUserFeatures({
                                     .filter(
                                       (t) => t.comments && t.comments.length > 0
                                     )
-                                    .map((t) => t.slug)
+                                    .map((t) => t.id)
                                 )
                               )
                             }

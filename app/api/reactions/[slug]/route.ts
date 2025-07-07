@@ -1,38 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, writeFile } from "fs/promises";
-import path from "path";
+import pb from "@/lib/pocketbase";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { slug: string } }
 ) {
   try {
-    const { type, action } = await request.json();
-    const metadataPath = path.join(
-      process.cwd(),
-      "public",
-      "uploads",
-      `${params.slug}.json`
-    );
+    const { type, userId } = await request.json(); // Assuming you send userId from client
+    const trackId = params.slug;
 
-    // Read current metadata
-    const data = await readFile(metadataPath, "utf-8");
-    const metadata = JSON.parse(data);
+    // Create a new reaction record
+    const newReaction = await pb.collection("reactions").create({
+      type: type,
+      user: userId, // Link to the user who reacted
+      track: trackId, // Link to the track
+    });
 
-    // Update reaction count
-    if (action === "add") {
-      metadata.reactions[type] = (metadata.reactions[type] || 0) + 1;
-    } else if (action === "remove") {
-      metadata.reactions[type] = Math.max(
-        0,
-        (metadata.reactions[type] || 0) - 1
-      );
-    }
+    // Optionally, you can fetch the updated track with all reactions
+    const updatedTrack = await pb
+      .collection("tracks")
+      .getOne(trackId, { expand: "reactions_" });
 
-    // Save updated metadata
-    await writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+    const reactions = updatedTrack.expand?.reactions_ || [];
 
-    return NextResponse.json({ success: true, reactions: metadata.reactions });
+    // Count reactions by type
+    const reactionCounts = reactions.reduce((acc: any, reaction: any) => {
+      acc[reaction.type] = (acc[reaction.type] || 0) + 1;
+      return acc;
+    }, {});
+
+    return NextResponse.json({ success: true, reactions: reactionCounts });
   } catch (error) {
     console.error("Reaction update error:", error);
     return NextResponse.json(

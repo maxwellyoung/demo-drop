@@ -16,6 +16,7 @@ interface Comment {
 interface TrackInteractionsProps {
   audioUrl: string;
   title: string;
+  artist?: string;
   trackSlug: string;
   initialComments: Comment[];
 }
@@ -23,6 +24,7 @@ interface TrackInteractionsProps {
 export default function TrackInteractions({
   audioUrl,
   title,
+  artist,
   trackSlug,
   initialComments,
 }: TrackInteractionsProps) {
@@ -84,6 +86,7 @@ export default function TrackInteractions({
         <UnifiedAudioPlayer
           audioUrl={audioUrl}
           title={title}
+          artist={artist}
           comments={comments}
           cloudSync={cloudSyncStatus}
         />
