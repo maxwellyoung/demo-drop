@@ -50,15 +50,13 @@ export default function WaveformPlayer({
 
     const wavesurfer = WaveSurfer.create({
       container: waveformRef.current,
-      waveColor: "#4f46e5",
-      progressColor: "#7c3aed",
-      cursorColor: "#f59e0b",
+      waveColor: "rgba(255, 255, 255, 0.3)",
+      progressColor: "rgba(255, 255, 255, 0.9)",
+      cursorColor: "transparent",
       barWidth: 2,
       barRadius: 3,
-      cursorWidth: 1,
       height: 80,
       barGap: 1,
-      responsive: true,
       normalize: true,
       backend: "WebAudio",
     });
