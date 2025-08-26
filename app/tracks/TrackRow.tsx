@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { usePlayer } from "../../components/PersistentMiniPlayer";
-import ShareButton from "../../components/ShareButton";
-import AddToPlaylistButton from "../../components/AddToPlaylistButton";
-import ArtworkGenerator from "../../components/ArtworkGenerator";
+import { usePlayer } from "@/components/PersistentMiniPlayer";
+import ShareButton from "@/components/ShareButton";
+import AddToPlaylistButton from "@/components/AddToPlaylistButton";
+import ArtworkGenerator from "@/components/ArtworkGenerator";
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { RecordModel } from "pocketbase";
@@ -59,7 +59,7 @@ export function TrackRow({
           else setSyncStatus("synced");
         }
       } catch (error) {
-        console.error("Failed to check sync status:", error);
+        // TODO: Implement proper error handling for sync status check
       }
     };
     checkSyncStatus();
@@ -138,12 +138,19 @@ export function TrackRow({
     }
   };
 
-  const convertRecordToTrack = (record: RecordModel): Track => {
+  const convertRecordToTrack = (record: RecordModel) => {
     return {
       slug: record.id,
+      originalName: record.title,
+      filename: record.audio,
       title: record.title,
       artist: record.artist,
+      uploadedAt: record.created,
+      size: record.filesize || 0,
+      type: "audio/mpeg",
+      reactions: { fire: 0, cry: 0, explode: 0, broken: 0 },
       audioUrl: `/api/stream/${record.audio}`,
+      extendedMetadata: record.extendedMetadata,
     };
   };
 

@@ -29,38 +29,9 @@ import {
 import { usePlayer } from "./PersistentMiniPlayer";
 import ArtworkGenerator from "./ArtworkGenerator";
 
-interface Track {
-  slug: string;
-  originalName: string;
-  filename: string;
-  title: string;
-  artist: string;
-  uploadedAt: string;
-  size: number;
-  type: string;
-  reactions: {
-    fire: number;
-    cry: number;
-    explode: number;
-    broken: number;
-  };
-  extendedMetadata?: {
-    description?: string;
-    tags?: string[];
-    credits?: string[];
-    notes?: string;
-    genre?: string;
-    bpm?: number;
-    key?: string;
-    duration?: number;
-  };
-  audioMetadata?: {
-    duration: number;
-    bitrate: number;
-    sampleRate: number;
-    channels: number;
-  };
-}
+import { TrackWithMetadata } from "../types";
+
+type Track = TrackWithMetadata;
 
 type ViewMode = "ultra-compact" | "list" | "grid";
 type SortField = "title" | "artist" | "uploadedAt" | "reactions" | "bpm";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { SPEED_OPTIONS, AUDIO_CONSTANTS } from "../../constants/audio";
+import { SPEED_OPTIONS, AUDIO_CONSTANTS } from "@/constants/audio";
 
 interface AudioControlsProps {
   isPlaying: boolean;

@@ -1,33 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { TrackWithMetadata, Playlist as PlaylistType } from "../types";
 
-interface Track {
-  slug: string;
-  title: string;
-  artist: string;
+interface Track extends TrackWithMetadata {
   audioUrl: string;
-  genre?: string;
-  extendedMetadata?: {
-    description?: string;
-    tags?: string[];
-    genre?: string;
-    bpm?: number;
-    key?: string;
-    duration?: number;
-  };
 }
 
-interface Playlist {
-  id: string;
-  name: string;
-  description?: string;
-  tracks: Track[];
-  createdAt: string;
-  updatedAt: string;
-  isCollaborative?: boolean;
-  tags?: string[];
-}
+type Playlist = PlaylistType;
 
 interface AddToPlaylistButtonProps {
   track: Track;

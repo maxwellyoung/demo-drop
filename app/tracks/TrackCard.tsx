@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { usePlayer } from "../../components/PersistentMiniPlayer";
-import ShareButton from "../../components/ShareButton";
-import AddToPlaylistButton from "../../components/AddToPlaylistButton";
-import ArtworkGenerator from "../../components/ArtworkGenerator";
+import { usePlayer } from "@/components/PersistentMiniPlayer";
+import ShareButton from "@/components/ShareButton";
+import AddToPlaylistButton from "@/components/AddToPlaylistButton";
+import ArtworkGenerator from "@/components/ArtworkGenerator";
 import {
   AnimatedCard,
   FadeIn,
@@ -308,7 +308,13 @@ export function TrackCard({ track, gradientFrom, gradientTo }: TrackCardProps) {
                   title: track.title,
                   artist: track.artist,
                   audioUrl: `/api/stream/${track.audio}`,
-                  genre: track.genre,
+                  originalName: track.title,
+                  filename: track.audio,
+                  uploadedAt: track.created,
+                  size: 0,
+                  type: "audio/mpeg",
+                  reactions: { fire: 0, cry: 0, explode: 0, broken: 0 },
+                  extendedMetadata: track.extendedMetadata,
                 }}
               />
             </motion.div>
