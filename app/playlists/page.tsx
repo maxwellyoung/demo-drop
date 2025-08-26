@@ -2,38 +2,9 @@ import { readdir, readFile } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
 import PlaylistManager from "@/components/PlaylistManager";
+import { TrackWithMetadata, ExtendedTrackMetadata } from "@/types";
 
-interface TrackMetadata {
-  slug: string;
-  originalName: string;
-  filename: string;
-  title: string;
-  artist: string;
-  uploadedAt: string;
-  size: number;
-  type: string;
-  reactions: {
-    fire: number;
-    cry: number;
-    explode: number;
-    broken: number;
-  };
-}
 
-interface ExtendedTrackMetadata {
-  description?: string;
-  tags?: string[];
-  credits?: string[];
-  notes?: string;
-  genre?: string;
-  bpm?: number;
-  key?: string;
-  duration?: number;
-}
-
-interface TrackWithMetadata extends TrackMetadata {
-  extendedMetadata?: ExtendedTrackMetadata;
-}
 
 async function getAllTracks(): Promise<TrackWithMetadata[]> {
   try {
@@ -57,7 +28,7 @@ async function getAllTracks(): Promise<TrackWithMetadata[]> {
       try {
         const filePath = path.join(uploadsDir, file);
         const data = await readFile(filePath, "utf-8");
-        const metadata: TrackMetadata = JSON.parse(data);
+        const metadata: TrackWithMetadata = JSON.parse(data);
 
         // Try to load extended metadata
         let extendedMetadata: ExtendedTrackMetadata | undefined;
@@ -94,12 +65,8 @@ export default async function PlaylistsPage() {
 
   // Convert tracks to the format expected by PlaylistManager
   const playlistTracks = tracks.map((track) => ({
-    slug: track.slug,
-    title: track.title,
-    artist: track.artist,
+    ...track,
     audioUrl: `/uploads/${track.filename}`,
-    genre: track.extendedMetadata?.genre,
-    extendedMetadata: track.extendedMetadata,
   }));
 
   return (

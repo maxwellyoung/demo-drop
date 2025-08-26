@@ -3,7 +3,8 @@ import { writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
 import slugify from "slugify";
-import { AudioProcessor } from "../../../lib/audio-processor";
+import { AudioProcessor } from "@/lib/audio-processor";
+import { log } from "@/lib/logger";
 
 // Configure the route to handle large files
 export const runtime = "nodejs";
@@ -49,9 +50,7 @@ export async function POST(request: NextRequest) {
     const isValidMimeType = allowedMimeTypes.includes(file.type);
     const isValidExtension = allowedExtensions.includes(fileExtension);
 
-    console.log(
-      `File validation - Name: ${file.name}, Type: ${file.type}, Extension: ${fileExtension}`
-    );
+         log.info(`File validation - Name: ${file.name}, Type: ${file.type}, Extension: ${fileExtension}`);
 
     if (!isValidMimeType && !isValidExtension) {
       return NextResponse.json(
@@ -94,7 +93,7 @@ export async function POST(request: NextRequest) {
         slug
       );
     } catch (error) {
-      console.error("Audio processing failed:", error);
+             log.error("Audio processing failed:", error);
       // Continue with basic upload if processing fails
       processedData = null;
     }
@@ -133,10 +132,10 @@ export async function POST(request: NextRequest) {
     const metadataPath = path.join(uploadsDir, `${slug}.json`);
     await writeFile(metadataPath, JSON.stringify(metadata, null, 2));
 
-    console.log(`Successfully uploaded: ${filename}`);
+         log.info(`Successfully uploaded: ${filename}`);
     return NextResponse.json({ slug, filename });
   } catch (error) {
-    console.error("Upload error:", error);
+         log.error("Upload error:", error);
 
     // More specific error handling
     if (error instanceof Error) {

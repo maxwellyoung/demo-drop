@@ -2,33 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { usePlayer } from "./PersistentMiniPlayer";
+import { TrackWithMetadata, Playlist as PlaylistType } from "../types";
 
-interface Track {
-  slug: string;
-  title: string;
-  artist: string;
+interface Track extends TrackWithMetadata {
   audioUrl: string;
-  genre?: string;
-  extendedMetadata?: {
-    description?: string;
-    tags?: string[];
-    genre?: string;
-    bpm?: number;
-    key?: string;
-    duration?: number;
-  };
 }
 
-interface Playlist {
-  id: string;
-  name: string;
-  description?: string;
-  tracks: Track[];
-  createdAt: string;
-  updatedAt: string;
-  isCollaborative?: boolean;
-  tags?: string[];
-}
+type Playlist = PlaylistType;
 
 interface PlaylistManagerProps {
   allTracks: Track[];
@@ -124,11 +104,15 @@ export default function PlaylistManager({
 
   const playPlaylist = (playlist: Playlist) => {
     if (playlist.tracks.length === 0) return;
-    playTrack(playlist.tracks[0]);
-    playlist.tracks.slice(1).forEach((track) => addToQueue(track));
+    const trackWithAudio = { ...playlist.tracks[0], audioUrl: `/api/stream/${playlist.tracks[0].filename}` };
+    playTrack(trackWithAudio);
+    playlist.tracks.slice(1).forEach((track) => {
+      const trackWithAudio = { ...track, audioUrl: `/api/stream/${track.filename}` };
+      addToQueue(trackWithAudio);
+    });
   };
 
-  const formatDuration = (tracks: Track[]) => {
+  const formatDuration = (tracks: TrackWithMetadata[]) => {
     const totalSeconds = tracks.reduce((acc, track) => {
       return acc + (track.extendedMetadata?.duration || 0);
     }, 0);

@@ -4,14 +4,7 @@ import { useState, useEffect } from "react";
 import UnifiedAudioPlayer from "./UnifiedAudioPlayer";
 import CommentsSection from "./CommentsSection";
 import CloudSyncStatusBar from "./CloudSyncStatusBar";
-
-interface Comment {
-  id: string;
-  author: string;
-  message: string;
-  timestamp: number;
-  audioTimestamp?: number;
-}
+import { Comment } from "../types";
 
 interface TrackInteractionsProps {
   audioUrl: string;

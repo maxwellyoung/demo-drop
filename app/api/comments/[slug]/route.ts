@@ -2,22 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, writeFile } from "fs/promises";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
-
-interface Comment {
-  id: string;
-  author: string;
-  message: string;
-  timestamp: number;
-  audioTimestamp?: number;
-  category?: "feedback" | "question" | "suggestion" | "bug" | "general";
-  reactions?: {
-    like?: number;
-    helpful?: number;
-    agree?: number;
-  };
-  replies?: Comment[];
-  parentId?: string;
-}
+import { Comment } from "../../../../types";
 
 interface CommentsData {
   comments: Comment[];
@@ -43,7 +28,7 @@ export async function GET(
       return NextResponse.json({ comments: [] });
     }
   } catch (error) {
-    console.error("Error reading comments:", error);
+    // TODO: Implement proper error logging
     return NextResponse.json(
       { error: "Failed to read comments" },
       { status: 500 }
@@ -118,17 +103,15 @@ export async function POST(
     // Create new comment
     const newComment: Comment = {
       id: uuidv4(),
+      trackSlug: params.slug,
       author: author.trim(),
-      message: message.trim(),
+      content: message.trim(),
       timestamp: Date.now(),
       audioTimestamp: audioTimestamp,
-      category: category || "feedback",
-      reactions: {
-        like: 0,
-        helpful: 0,
-        agree: 0,
-      },
+      reactions: [],
       replies: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     if (parentId) {
@@ -169,7 +152,7 @@ export async function POST(
 
     return NextResponse.json(newComment);
   } catch (error) {
-    console.error("Error saving comment:", error);
+    // TODO: Implement proper error logging
     return NextResponse.json(
       { error: "Failed to save comment" },
       { status: 500 }
@@ -236,7 +219,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, message: "Comment deleted" });
   } catch (error) {
-    console.error("Error deleting comment:", error);
+    // TODO: Implement proper error logging
     return NextResponse.json(
       { error: "Failed to delete comment" },
       { status: 500 }

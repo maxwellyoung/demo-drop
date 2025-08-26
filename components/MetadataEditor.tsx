@@ -1,17 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
-interface ExtendedTrackMetadata {
-  description: string;
-  tags: string[];
-  credits: string[];
-  notes: string;
-  genre: string;
-  bpm: number | null;
-  key: string;
-  duration: number | null;
-}
+import { ExtendedTrackMetadata } from "../types";
 
 interface MetadataEditorProps {
   trackSlug: string;
@@ -24,9 +14,9 @@ export default function MetadataEditor({ trackSlug }: MetadataEditorProps) {
     credits: [],
     notes: "",
     genre: "",
-    bpm: null,
+    bpm: undefined,
     key: "",
-    duration: null,
+    duration: undefined,
   });
 
   const [isEditing, setIsEditing] = useState(false);
@@ -75,10 +65,10 @@ export default function MetadataEditor({ trackSlug }: MetadataEditorProps) {
   };
 
   const addTag = () => {
-    if (newTag.trim() && !metadata.tags.includes(newTag.trim())) {
+    if (newTag.trim() && !metadata.tags?.includes(newTag.trim())) {
       setMetadata({
         ...metadata,
-        tags: [...metadata.tags, newTag.trim()],
+        tags: [...(metadata.tags || []), newTag.trim()],
       });
       setNewTag("");
     }
@@ -87,15 +77,15 @@ export default function MetadataEditor({ trackSlug }: MetadataEditorProps) {
   const removeTag = (tagToRemove: string) => {
     setMetadata({
       ...metadata,
-      tags: metadata.tags.filter((tag) => tag !== tagToRemove),
+      tags: metadata.tags?.filter((tag) => tag !== tagToRemove) || [],
     });
   };
 
   const addCredit = () => {
-    if (newCredit.trim() && !metadata.credits.includes(newCredit.trim())) {
+    if (newCredit.trim() && !metadata.credits?.includes(newCredit.trim())) {
       setMetadata({
         ...metadata,
-        credits: [...metadata.credits, newCredit.trim()],
+        credits: [...(metadata.credits || []), newCredit.trim()],
       });
       setNewCredit("");
     }
@@ -104,7 +94,7 @@ export default function MetadataEditor({ trackSlug }: MetadataEditorProps) {
   const removeCredit = (creditToRemove: string) => {
     setMetadata({
       ...metadata,
-      credits: metadata.credits.filter((credit) => credit !== creditToRemove),
+      credits: metadata.credits?.filter((credit) => credit !== creditToRemove) || [],
     });
   };
 
@@ -154,11 +144,11 @@ export default function MetadataEditor({ trackSlug }: MetadataEditorProps) {
             </div>
           )}
 
-          {metadata.tags.length > 0 && (
+          {metadata.tags && metadata.tags.length > 0 && (
             <div>
               <span className="text-secondary text-sm block mb-2">Tags</span>
               <div className="flex flex-wrap gap-2">
-                {metadata.tags.map((tag, index) => (
+                {metadata.tags?.map((tag, index) => (
                   <span
                     key={index}
                     className="px-3 py-1 bg-neutral-800/50 rounded-full text-xs"
@@ -170,11 +160,11 @@ export default function MetadataEditor({ trackSlug }: MetadataEditorProps) {
             </div>
           )}
 
-          {metadata.credits.length > 0 && (
+          {metadata.credits && metadata.credits.length > 0 && (
             <div>
               <span className="text-secondary text-sm block mb-2">Credits</span>
               <div className="space-y-1">
-                {metadata.credits.map((credit, index) => (
+                {metadata.credits?.map((credit, index) => (
                   <div key={index} className="text-sm">
                     {credit}
                   </div>
@@ -305,7 +295,7 @@ export default function MetadataEditor({ trackSlug }: MetadataEditorProps) {
               </button>
             </div>
             <div className="flex flex-wrap gap-2">
-              {metadata.tags.map((tag, index) => (
+              {metadata.tags?.map((tag, index) => (
                 <span
                   key={index}
                   className="px-3 py-1 bg-neutral-800/50 rounded-full text-xs flex items-center gap-2"
@@ -344,7 +334,7 @@ export default function MetadataEditor({ trackSlug }: MetadataEditorProps) {
               </button>
             </div>
             <div className="space-y-2">
-              {metadata.credits.map((credit, index) => (
+              {metadata.credits?.map((credit, index) => (
                 <div
                   key={index}
                   className="flex items-center justify-between px-3 py-2 bg-neutral-800/50 rounded-lg text-sm"
@@ -384,7 +374,7 @@ export default function MetadataEditor({ trackSlug }: MetadataEditorProps) {
               onChange={(e) =>
                 setMetadata({
                   ...metadata,
-                  bpm: e.target.value ? parseInt(e.target.value) : null,
+                  bpm: e.target.value ? parseInt(e.target.value) : undefined,
                 })
               }
               className="w-full px-4 py-2 bg-neutral-800/50 border border-neutral-700/50 rounded-lg text-sm focus:outline-none focus:border-neutral-600 focus:bg-neutral-800"

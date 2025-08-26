@@ -1,22 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
-interface Comment {
-  id: string;
-  author: string;
-  message: string;
-  timestamp: number;
-  audioTimestamp?: number;
-  category?: "feedback" | "question" | "suggestion" | "bug" | "general";
-  reactions?: {
-    like?: number;
-    helpful?: number;
-    agree?: number;
-  };
-  replies?: Comment[];
-  parentId?: string;
-}
+import { Comment } from "../types";
 
 interface CommentsSectionProps {
   trackSlug: string;
@@ -33,7 +18,7 @@ export default function CommentsSection({
   const [isLoading, setIsLoading] = useState(false);
   const [pendingTimestamp, setPendingTimestamp] = useState<number | null>(null);
   const [selectedCategory, setSelectedCategory] =
-    useState<Comment["category"]>("feedback");
+    useState<"feedback" | "question" | "suggestion" | "bug" | "general">("feedback");
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyMessage, setReplyMessage] = useState("");
   const [showReplies, setShowReplies] = useState<Set<string>>(new Set());
@@ -74,7 +59,7 @@ export default function CommentsSection({
           author: author.trim(),
           message: message.trim(),
           audioTimestamp: pendingTimestamp,
-          category: selectedCategory,
+
         }),
       });
 
@@ -150,7 +135,7 @@ export default function CommentsSection({
 
   const handleReaction = async (
     commentId: string,
-    reactionType: "like" | "helpful" | "agree"
+    reactionType: "like" | "love" | "laugh" | "wow" | "sad" | "angry"
   ) => {
     try {
       const response = await fetch(`/api/comments/${trackSlug}/reactions`, {
@@ -169,10 +154,10 @@ export default function CommentsSection({
           if (comment.id === commentId) {
             return {
               ...comment,
-              reactions: {
-                ...comment.reactions,
-                [reactionType]: (comment.reactions?.[reactionType] || 0) + 1,
-              },
+                          reactions: [
+              ...comment.reactions,
+              { type: reactionType as any, count: 1, userReaction: true }
+            ],
             };
           }
           return comment;
@@ -245,7 +230,7 @@ export default function CommentsSection({
     }
   };
 
-  const getCategoryIcon = (category: Comment["category"]) => {
+  const getCategoryIcon = (category: "feedback" | "question" | "suggestion" | "bug" | "general") => {
     switch (category) {
       case "feedback":
         return "💬";
@@ -260,7 +245,7 @@ export default function CommentsSection({
     }
   };
 
-  const getCategoryColor = (category: Comment["category"]) => {
+  const getCategoryColor = (category: "feedback" | "question" | "suggestion" | "bug" | "general") => {
     switch (category) {
       case "feedback":
         return "text-blue-400 bg-blue-900/20 border-blue-800/50";
@@ -293,15 +278,7 @@ export default function CommentsSection({
       <div className="flex flex-col sm:flex-row items-start justify-between mb-2 gap-2">
         <div className="flex items-center gap-3 flex-wrap">
           <span className="font-medium text-sm">{comment.author}</span>
-          {comment.category && (
-            <span
-              className={`px-2 py-1 rounded-md text-xs border ${getCategoryColor(
-                comment.category
-              )}`}
-            >
-              {getCategoryIcon(comment.category)} {comment.category}
-            </span>
-          )}
+
           {comment.audioTimestamp !== undefined && (
             <button
               onClick={() => handleSeekToTime(comment.audioTimestamp!)}
@@ -340,7 +317,7 @@ export default function CommentsSection({
       </div>
 
       <p className="text-sm text-neutral-300 leading-relaxed mb-3">
-        {comment.message}
+        {comment.content}
       </p>
 
       {/* Reactions */}
@@ -349,19 +326,19 @@ export default function CommentsSection({
           onClick={() => handleReaction(comment.id, "like")}
           className="flex items-center gap-1 px-2 py-1 bg-neutral-800/50 hover:bg-neutral-700/50 rounded-md text-xs text-neutral-400 hover:text-red-400 transition-all duration-200"
         >
-          👍 {comment.reactions?.like || 0}
+          👍 {comment.reactions.filter(r => r.type === "like").reduce((sum, r) => sum + r.count, 0)}
         </button>
         <button
-          onClick={() => handleReaction(comment.id, "helpful")}
+          onClick={() => handleReaction(comment.id, "love")}
           className="flex items-center gap-1 px-2 py-1 bg-neutral-800/50 hover:bg-neutral-700/50 rounded-md text-xs text-neutral-400 hover:text-green-400 transition-all duration-200"
         >
-          ✅ {comment.reactions?.helpful || 0}
+          ❤️ {comment.reactions.filter(r => r.type === "love").reduce((sum, r) => sum + r.count, 0)}
         </button>
         <button
-          onClick={() => handleReaction(comment.id, "agree")}
+          onClick={() => handleReaction(comment.id, "wow")}
           className="flex items-center gap-1 px-2 py-1 bg-neutral-800/50 hover:bg-neutral-700/50 rounded-md text-xs text-neutral-400 hover:text-blue-400 transition-all duration-200"
         >
-          👌 {comment.reactions?.agree || 0}
+          😮 {comment.reactions.filter(r => r.type === "wow").reduce((sum, r) => sum + r.count, 0)}
         </button>
       </div>
 
@@ -479,7 +456,7 @@ export default function CommentsSection({
             <select
               value={selectedCategory}
               onChange={(e) =>
-                setSelectedCategory(e.target.value as Comment["category"])
+                setSelectedCategory(e.target.value as "feedback" | "question" | "suggestion" | "bug" | "general")
               }
               className="px-4 py-3 bg-neutral-900/50 border border-neutral-700/50 rounded-xl text-sm text-neutral-300 focus:outline-none focus:border-neutral-600 transition-colors"
             >

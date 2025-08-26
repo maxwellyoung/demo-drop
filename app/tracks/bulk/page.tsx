@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import BulkTrackTable from "../../../components/BulkTrackTable";
+import BulkTrackTable from "@/components/BulkTrackTable";
 import { Trash2, Edit, Play, AlertTriangle } from "lucide-react";
 
 interface Track {
@@ -33,7 +33,7 @@ export default function BulkTracksPage() {
       const data = await response.json();
       setTracks(data.tracks || []);
     } catch (error) {
-      console.error("Failed to load tracks:", error);
+      // TODO: Implement proper error handling for failed track loading
     } finally {
       setLoading(false);
     }
@@ -65,7 +65,7 @@ export default function BulkTracksPage() {
         setTracksToDelete([]);
       }
     } catch (error) {
-      console.error("Failed to delete tracks:", error);
+      // TODO: Implement proper error handling for failed track deletion
     }
   };
 
@@ -80,12 +80,12 @@ export default function BulkTracksPage() {
 
   const handlePlay = (trackId: string) => {
     // Implement play functionality
-    console.log("Playing track:", trackId);
+    // TODO: Implement actual play functionality
   };
 
   const handleBulkEdit = (trackIds: string[]) => {
     // Implement bulk edit functionality
-    console.log("Bulk editing tracks:", trackIds);
+    // TODO: Implement actual bulk edit functionality
   };
 
   if (loading) {

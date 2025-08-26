@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
-import SmartCollections from "../../components/SmartCollections";
+import SmartCollections from "@/components/SmartCollections";
 import {
   IridescentButton,
   IridescentCard,
